@@ -237,7 +237,7 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 
 	Write-Host "Getting Hardware Information..."
 	
-	Get-WmiObject Win32_PhysicalMemory 2>> $log | Select banklabel, devicelocator, capacity, manufacturer, configuredclockspeed, configuredvoltage | Format-Table > "$path\ram.txt"
+	Get-WmiObject Win32_PhysicalMemory 2>> $log | Select banklabel, devicelocator, capacity, manufacturer, configuredclockspeed, configuredvoltage | Format-List > "$path\ram.txt"
 
 # Processor Information
 
@@ -250,6 +250,10 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 	Get-Disk 2>> $log | Select FriendlyName, Model, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, FirmwareVersion, PartitionStyle, Path | Format-List > "$path\disks.txt"
 
 	Get-WmiObject Win32_LogicalDisk 2>> $log | ForEach-Object {write " $($_.caption) $('{0:N2}' -f ($_.Size/1gb)) GB total, $('{0:N2}' -f ($_.FreeSpace/1gb)) GB free "} >> "$path\disks.txt"
+
+# GPU Information
+
+	Get-WmiObject Win32_VideoController 2>> $log | Select Name, Description, DeviceID, PNPDeviceID, VideoProcessor, CurrentRefreshRate, VideoModeDescription, AdapterRAM, DriverVersion, InfFilename, InstalledDisplayDrivers, DriverDate, InstallDate, Status, StatusInfo, LastErrorCode, ErrorDescription | Format-List > "$path\gpu.txt"
 
 # Windows license information
 
