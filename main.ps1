@@ -74,7 +74,7 @@
 
 # Set variables
 
-	$scriptver = "Version alpha002 - 8/17/17"
+	$scriptver = "Version alpha002 - 8/18/17"
 	$time = Get-Date -format M-d-yyyy
 	$name = "$env:computername ($time)"
 	$path = "$home\Desktop\Logs-$name"
@@ -203,21 +203,21 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 
 	Write-Host "Exporting Application Event Log..."
 
-	#wevtutil.exe query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 1209600000]]]" /f:text > $path\Events\application-events.txt 2>> $log
+	wevtutil.exe query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" /f:text > $path\Events\application-events.txt 2>> $log
 
-	wevtutil.exe export-log Application $path\Events\application-events.evtx /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" 2>> $log
+#	wevtutil.exe export-log Application $path\Events\application-events.evtx /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" 2>> $log
 
 	Write-Host "Exporting System Event Log..."
 
-	#wevtutil.exe query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 1209600000]]]" /f:text > $path\Events\system-events.txt 2>> $log
+	wevtutil.exe query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" /f:text > $path\Events\system-events.txt 2>> $log
 
-	wevtutil.exe export-log System $path\Events\system-events.evtx /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" 2>> $log
+#	wevtutil.exe export-log System $path\Events\system-events.evtx /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" 2>> $log
 
 	Write-Host "Exporting WHEA Event Log..."
 
-	#wevtutil.exe query-events Microsoft-Windows-Kernel-WHEA/Errors /q:"*[System[TimeCreated[timediff(@SystemTime) <= 1209600000]]]" /f:text > $path\Events\whea-events.txt 2>> $log
+	wevtutil.exe query-events Microsoft-Windows-Kernel-WHEA/Errors /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" /f:text > $path\Events\whea-events.txt 2>> $log
 
-	wevtutil.exe export-log Microsoft-Windows-Kernel-WHEA/Errors $path\Events\whea-events.evtx /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" 2>> $log
+#	wevtutil.exe export-log Microsoft-Windows-Kernel-WHEA/Errors $path\Events\whea-events.evtx /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" 2>> $log
 
 # Driver information
 
@@ -256,11 +256,15 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 	Get-Disk 2>> $log | Select FriendlyName, Model, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, FirmwareVersion, PartitionStyle, Path | Format-List > "$path\disks.txt"
 
 	Get-WmiObject Win32_LogicalDisk 2>> $log | ForEach-Object {write " $($_.caption) $('{0:N2}' -f ($_.Size/1gb)) GB total, $('{0:N2}' -f ($_.FreeSpace/1gb)) GB free "} >> "$path\disks.txt"
+	
+# System Board Information
+
+	Get-WmiObject Win32_BaseBoard 2>> $log | Select Product, Model, Version, Manufacturer, Description > "$path\motherboard.txt"
 
 # GPU Information
 
-Get-WmiObject Win32_VideoController 2>> $log | Select Name, DeviceID, PNPDeviceID, VideoProcessor, CurrentRefreshRate, VideoModeDescription, AdapterRAM, DriverVersion, InfFilename, InstalledDisplayDrivers, InstallDate, DriverDate, Status, StatusInfo, LastErrorCode, ErrorDescription | Format-List > "$path\gpu.txt"
-
+	Get-WmiObject Win32_VideoController 2>> $log | Select Name, DeviceID, PNPDeviceID, VideoProcessor, CurrentRefreshRate, VideoModeDescription, AdapterRAM, DriverVersion, InfFilename, InstalledDisplayDrivers, InstallDate, DriverDate, Status, StatusInfo, LastErrorCode, ErrorDescription | Format-List > "$path\gpu.txt"
+	
 # Windows license information
 
 	Write-Host "Finding Windows License Information..."
@@ -382,6 +386,9 @@ Get-WmiObject Win32_VideoController 2>> $log | Select Name, DeviceID, PNPDeviceI
 			Else {
 			
 				Write-Warning "$scriptdir\7za.exe not found"
+				Write-Warning "Skipping Compression..."
+
+				$compression = "False"
 			}
 		}
 
@@ -418,6 +425,9 @@ Get-WmiObject Win32_VideoController 2>> $log | Select Name, DeviceID, PNPDeviceI
 			Else {
 			
 				Write-Warning "$scriptdir\7za.exe not found"
+				Write-Warning "Skipping Compression..."
+
+				$compression = "False"
 			}
 		}
 	}
@@ -435,6 +445,8 @@ Get-WmiObject Win32_VideoController 2>> $log | Select Name, DeviceID, PNPDeviceI
 			
 		Write-Warning "$scriptdir\7za.exe not found"
 		Write-Warning "Skipping Compression..."
+
+		$compression = "False"
 	}
 
 	Write-Host "`n"
