@@ -146,9 +146,9 @@
 
 		Write-Host "Finding Auto-Start Entries..."
 
-		# b = boot execute, d = Appinit DLLs, w = winlogon, h = image hijacks, e = explorer add-ons, l = logon, o = office add-ins, t = scheduled tasks
+		# b = boot execute, d = Appinit DLLs, w = winlogon, h = image hijacks, e = explorer add-ons, l = logon, t = scheduled tasks
 	
-		Start-Process -FilePath "$scriptdir\autorunsc.exe" -ArgumentList "-accepteula","-nobanner","-s","-m","-a","bdwhelot" -NoNewWindow -Wait -RedirectStandardOutput "$path\autorun.txt" 2>> "$adminlog"
+		Start-Process -FilePath "$scriptdir\autorunsc.exe" -ArgumentList "-accepteula","-nobanner","-s","-m","-a","bdwhelt" -NoNewWindow -Wait -RedirectStandardOutput "$path\autorun.txt" 2>> "$adminlog"
 	}
 	
 	Else {
