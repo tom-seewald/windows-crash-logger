@@ -113,6 +113,33 @@
 
 	Else { Get-Service 2>> $elevatedlog | Select-Object Status,Name,DisplayName | Sort-Object -Property @{Expression = "Status"; Descending = $True}, @{Expression = "Name"; Descending = $False} | Format-Table -Autosize > "$path\services.txt" }
 
+# Copy Windows Error Reports
+
+	Write-Host "Copying Windows Error Reports..."
+
+	If ( Test-Path "$home\AppData\Local\Microsoft\Windows\WER\ReportArchive" ) {
+
+		Copy-Item -Recurse "$home\AppData\Local\Microsoft\Windows\WER\ReportArchive\*" -Destination "$path\Error Reports" > $null 2>> $elevatedlog
+	}
+
+	If ( Test-Path "$home\AppData\Local\Microsoft\Windows\WER\ReportQueue" ) {
+
+		Copy-Item -Recurse "$home\AppData\Local\Microsoft\Windows\WER\ReportQueue\*" -Destination "$path\Error Reports" > $null 2>> $elevatedlog
+	}
+
+	If ( Test-Path "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportArchive" ) {
+
+		Copy-Item -Recurse "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportArchive\*" -Destination "$path\Error Reports" > $null 2>> $elevatedlog
+	}
+
+        If ( Test-Path "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportQueue" ) {
+
+                Copy-Item -Recurse "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportQueue\*" -Destination "$path\Error Reports" > $null 2>> $elevatedlog
+        }
+~
+
+
+
 # List all autostart entries that are not cryptographically signed by Microsoft (-s -m)
 
 	If ( Test-Path "$scriptdir\autorunsc.exe" ) {
@@ -128,28 +155,4 @@
 	
 		Write-Warning "$scriptdir\autorunsc.exe not found"
 		echo "$scriptdir\autorunsc.exe not found" >> "$adminlog"
-	}
-
-# Copy Windows Error Reports
-
-	Write-Host "Copying Windows Error Reports..."
-
-	If ( Test-Path "$home\AppData\Local\Microsoft\Windows\WER\ReportArchive" ) {
-
-		Copy-Item -Recurse "$home\AppData\Local\Microsoft\Windows\WER\ReportArchive\*" -Destination "$path\Error Reports" > $null 2>> $elevatedlog
-	}
-
-	If ( Test-Path "$home\AppData\Local\Microsoft\Windows\WER\ReportQueue\*" ) {
-
-		Copy-Item -Recurse "$home\AppData\Local\Microsoft\Windows\WER\ReportQueue\*" -Destination "$path\Error Reports" > $null 2>> $elevatedlog
-	}
-
-	If ( Test-Path "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportArchive" ) {
-
-		Copy-Item -Recurse "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportArchive\*" -Destination "$path\Error Reports" > $null 2>> $elevatedlog
-	}
-
-	If ( Test-Path "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportQueue" ) {
-
-		Copy-Item -Recurse "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportQueue\*" -Destination "$path\Error Reports" > $null 2>> $elevatedlog
 	}
