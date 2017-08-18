@@ -199,19 +199,25 @@ Kernel		2					<does not exist>
 Small		3					<does not exist>
 Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 
-# Export Event Logs as flat text (1209600000 ms = 14 days)
+# Export Event Logs (1209600000ms = 14 days, 604800000ms = 7 days)
 
 	Write-Host "Exporting Application Event Log..."
 
-	wevtutil.exe query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 1209600000]]]" /f:text > $path\Events\application-events.txt 2>> $log
+	#wevtutil.exe query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 1209600000]]]" /f:text > $path\Events\application-events.txt 2>> $log
+
+	wevtutil.exe export-log Application $path\Events\application-events.evtx /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" 2>> $log
 
 	Write-Host "Exporting System Event Log..."
 
-	wevtutil.exe query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 1209600000]]]" /f:text > $path\Events\system-events.txt 2>> $log
+	#wevtutil.exe query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 1209600000]]]" /f:text > $path\Events\system-events.txt 2>> $log
+
+	wevtutil.exe export-log System $path\Events\system-events.evtx /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" 2>> $log
 
 	Write-Host "Exporting WHEA Event Log..."
 
-	wevtutil.exe query-events Microsoft-Windows-Kernel-WHEA/Errors /q:"*[System[TimeCreated[timediff(@SystemTime) <= 1209600000]]]" /f:text > $path\Events\whea-events.txt 2>> $log
+	#wevtutil.exe query-events Microsoft-Windows-Kernel-WHEA/Errors /q:"*[System[TimeCreated[timediff(@SystemTime) <= 1209600000]]]" /f:text > $path\Events\whea-events.txt 2>> $log
+
+	wevtutil.exe export-log Microsoft-Windows-Kernel-WHEA/Errors $path\Events\whea-events.evtx /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" 2>> $log
 
 # Driver information
 
