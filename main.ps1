@@ -269,7 +269,7 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 
 	Write-Host "Finding Windows License Information..."
 
-	cscript.exe $env:SystemRoot\System32\slmgr.vbs /dli | Select-Object -Skip 4 > "$path\windows-license-info.txt" 2>> $log
+	cscript.exe $env:SystemRoot\System32\slmgr.vbs /dlv | Select-Object -Skip 4 > "$path\windows-license-info.txt" 2>> $log
 
 # Installed Software, first check native and then 32-bit (if it exists)
 
