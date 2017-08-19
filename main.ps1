@@ -167,6 +167,8 @@
 		Write-Warning "$scriptdir\elevated.ps1 not found!"
 		echo "$scriptdir\elevated.ps1 not found!" >> $log
 		$elevatedscriptfailed = "1"
+		
+		If ( Test-Path "$env:SystemRoot\Temp\home.txt" ) { Remove-Item "$env:SystemRoot\Temp\home.txt" }
 	}
 
 # DirectX Diagnostics Report
