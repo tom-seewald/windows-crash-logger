@@ -74,7 +74,7 @@
 
 # Set variables
 
-	$scriptver = "Version alpha002 - 8/18/17"
+	$scriptver = "Version alpha003 - 8/18/17"
 	$time = Get-Date -format M-d-yyyy
 	$name = "$env:computername ($time)"
 	$path = "$home\Desktop\Logs-$name"
