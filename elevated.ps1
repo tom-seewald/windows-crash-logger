@@ -136,9 +136,6 @@
 
                 Copy-Item -Recurse "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportQueue\*" -Destination "$path\Error Reports" > $null 2>> $elevatedlog
         }
-~
-
-
 
 # List all autostart entries that are not cryptographically signed by Microsoft (-s -m)
 
