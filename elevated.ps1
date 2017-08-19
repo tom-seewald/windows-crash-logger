@@ -122,20 +122,10 @@
 		Copy-Item -Recurse "$home\AppData\Local\Microsoft\Windows\WER\ReportArchive\*" -Destination "$path\Error Reports" > $null 2>> $elevatedlog
 	}
 
-	If ( Test-Path "$home\AppData\Local\Microsoft\Windows\WER\ReportQueue" ) {
-
-		Copy-Item -Recurse "$home\AppData\Local\Microsoft\Windows\WER\ReportQueue\*" -Destination "$path\Error Reports" > $null 2>> $elevatedlog
-	}
-
 	If ( Test-Path "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportArchive" ) {
 
 		Copy-Item -Recurse "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportArchive\*" -Destination "$path\Error Reports" > $null 2>> $elevatedlog
 	}
-
-        If ( Test-Path "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportQueue" ) {
-
-                Copy-Item -Recurse "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportQueue\*" -Destination "$path\Error Reports" > $null 2>> $elevatedlog
-        }
 
 # List all autostart entries that are not cryptographically signed by Microsoft (-s -m)
 
