@@ -96,6 +96,15 @@
 		powercfg.exe /sleepstudy /output "$path\power-report.html" > $null 2>> $elevatedlog
 	}
 
+# Disk and Partition Information, 8.1 requires admin rights unlike 10
+
+	If ( $vernum -eq "6.3" ) {
+
+		Get-Partition 2>> $log | Format-List > "$path\partitions.txt"
+
+		Get-Disk 2>> $log | Select FriendlyName, Model, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, FirmwareVersion, PartitionStyle, Path | Format-List >> "$path\disks.txt"																	 "$path\disks.txt"
+	}
+
 # List all processes
 
 	Write-Host "Enumerating Running Processes..."

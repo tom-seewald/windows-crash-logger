@@ -74,7 +74,7 @@
 
 # Set variables
 
-	$scriptver = "Version alpha003 - 8/18/17"
+	$scriptver = "Version alpha003 - 8/19/17"
 	$time = Get-Date -format M-d-yyyy
 	$name = "$env:computername ($time)"
 	$path = "$home\Desktop\Logs-$name"
@@ -207,19 +207,13 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 
 	wevtutil.exe query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" /f:text > $path\Events\application-events.txt 2>> $log
 
-#	wevtutil.exe export-log Application $path\Events\application-events.evtx /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" 2>> $log
-
 	Write-Host "Exporting System Event Log..."
 
 	wevtutil.exe query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" /f:text > $path\Events\system-events.txt 2>> $log
 
-#	wevtutil.exe export-log System $path\Events\system-events.evtx /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" 2>> $log
-
 	Write-Host "Exporting WHEA Event Log..."
 
 	wevtutil.exe query-events Microsoft-Windows-Kernel-WHEA/Errors /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" /f:text > $path\Events\whea-events.txt 2>> $log
-
-#	wevtutil.exe export-log Microsoft-Windows-Kernel-WHEA/Errors $path\Events\whea-events.evtx /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" 2>> $log
 
 # Driver information
 
@@ -253,9 +247,12 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 
 # Disk and Partition Information
 
-	Get-Partition 2>> $log | Format-List > "$path\partitions.txt"
+	If ( $vernum -ge "10.0" ) {
 
-	Get-Disk 2>> $log | Select FriendlyName, Model, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, FirmwareVersion, PartitionStyle, Path | Format-List > "$path\disks.txt"
+		Get-Partition 2>> $log | Format-List > "$path\partitions.txt"
+
+		Get-Disk 2>> $log | Select FriendlyName, Model, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, FirmwareVersion, PartitionStyle, Path | Format-List > "$path\disks.txt"
+	}
 
 	Get-WmiObject Win32_LogicalDisk 2>> $log | ForEach-Object {write " $($_.caption) $('{0:N2}' -f ($_.Size/1gb)) GB total, $('{0:N2}' -f ($_.FreeSpace/1gb)) GB free "} >> "$path\disks.txt"
 	
