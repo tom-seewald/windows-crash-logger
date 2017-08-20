@@ -314,10 +314,6 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 		waitloop $dxdiag dxdiag.exe 30
 	}
 
-	Else {
-
-		echo "dxdiag.exe crashed or was closed by the user!" >> $log
-	}
 # Wait if msinfo32.exe has not finished, kill process if timeout is reached
 
 	If ( $msinfo32 -ne $null ) {
@@ -325,21 +321,11 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 		waitloop $msinfo32 msinfo32.exe 120 "$path\info.nfo"
 	}
 
-	Else {
-
-		echo "msinfo32.exe crashed or was closed by the user!" >> $log
-	}
-
 # Wait if the elevated script has not finished, include timeout and kill process if timeout is reached, .HasExited on a PowerShell script appears to be broken on PowerShell v2
 
 	If ( $elevated_script -ne $null ) {
 
 		waitloop $elevated_script "Elevated Script" 120
-	}
-
-	ElseIf ( $elevatedscriptfailed -ne "1" ) {
-
-		echo "elevated.ps1 crashed or was closed by the user!" >> $log
 	}
 
 # Move logs into $path if they exist and are not empty
