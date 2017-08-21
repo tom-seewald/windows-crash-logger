@@ -1,7 +1,5 @@
-# Set variables
+# Set output for logging
 
-	$time = Get-Date -format M-d-yyyy
-	$name = "$env:computername ($time)"
 	$elevatedlog = "$env:TEMP\script-log-elevated.log"
 
 # Check that this script is being run with elevated credentials, e.g. Administrator, SYSTEM, or TrustedInstaller
@@ -32,20 +30,18 @@
 
 	$Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size (1000,1000)
 
-# Get path of home for the locally logged in user - we don't want this to go to the wrong folder if the user is not the admin account running this
+# Get output path from main.ps1
 
-	If ( !(Test-Path "$env:SystemRoot\Temp\home.txt") ) { 
+	If ( !(Test-Path "$env:SystemRoot\Temp\path.txt") ) { 
 
-		Write-Warning "$env:SystemRoot\Temp\home.txt does not exist! exiting..."
-		echo "$env:SystemRoot\Temp\home.txt does not exist. Script aborted!" >> $elevatedlog
+		Write-Warning "$env:SystemRoot\Temp\path.txt does not exist! exiting..."
+		echo "$env:SystemRoot\Temp\path.txt does not exist. Script aborted!" >> $elevatedlog
 		exit
 	}
 
-	$localhome = Get-Content "$env:SystemRoot\Temp\home.txt"
+	$path = Get-Content "$env:SystemRoot\Temp\path.txt"
 
-	Remove-Item "$env:SystemRoot\Temp\home.txt" > $null 2>> $elevatedlog
-
-	$path = "$localhome\Desktop\Logs-$name"
+	Remove-Item "$env:SystemRoot\Temp\path.txt" > $null 2>> $elevatedlog
 
 # Copy Crash Dumps
 

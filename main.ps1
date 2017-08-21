@@ -72,12 +72,17 @@
 		Write-Warning "This Script Has Not Been Tested On Windows 8, Please Upgrade!"
 	}
 
-# Set variables
+# Set variables for output
 
-	$scriptver = "Version alpha003 - 8/19/17"
-	$time = Get-Date -format M-d-yyyy
+	$scriptver = "Version alpha003 - 8/20/17"
+	
+	$time = Get-Date
+	$time = $time.ToShortDateString() + " " + $time.ToShortTimeString()
+	$time = $time -Replace ":"," "
+	$time = $time -Replace "/","-"
+	
 	$name = "$env:computername ($time)"
-	$path = "$home\Desktop\Logs-$name"
+	$path = "$home\Desktop\$name"
 	$log = "$env:TEMP\script-log.log"
 	$elevatedlog = "$env:TEMP\script-log-elevated.log"
 	$zip = "$path" + ".zip"
@@ -108,9 +113,9 @@
 
 	clear
 
-# Store the home of the current user so elevated.ps1 can retrieve it, elevated.ps1 may run under a different account
+# Store the path so elevated.ps1 can retrieve it, elevated.ps1 may run under a different account or during a time change
 
-	echo "$home" > "$env:SystemRoot\Temp\home.txt"
+	echo "$path" > "$env:SystemRoot\Temp\path.txt"
 	
 # Check for pre-existing files and folders, and remove them if they exist
 
@@ -168,7 +173,7 @@
 		echo "$scriptdir\elevated.ps1 not found!" >> $log
 		$elevatedscriptfailed = "1"
 		
-		If ( Test-Path "$env:SystemRoot\Temp\home.txt" ) { Remove-Item "$env:SystemRoot\Temp\home.txt" }
+		If ( Test-Path "$env:SystemRoot\Temp\path.txt" ) { Remove-Item "$env:SystemRoot\Temp\path.txt" }
 	}
 
 # DirectX Diagnostics Report
