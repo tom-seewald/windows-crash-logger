@@ -74,7 +74,7 @@
 
 # Set variables for output
 
-	$scriptver = "Version alpha003 - 8/20/17"
+	$scriptver = "Version alpha004 - 8/21/17"
 	
 	$time = Get-Date
 	$time = $time.ToShortDateString() + " " + $time.ToShortTimeString()
@@ -90,15 +90,16 @@
 # User Banner
 
 	clear
+
 	Write-Host "
   ______              ______                          _              
- /_  __/__  ____     / ____/___  _______  ______ ___ ( )_____        
-  / / / _ \/ __ \   / /_  / __ \/ ___/ / / / __ `__ \|// ___/        
+ /_  __/__  ____     / ____/___  _______  __________ ( )_____        
+  / / / _ \/ __ \   / /_  / __ \/ ___/ / / / __  __ \|// ___/        
  / / /  __/ / / /  / __/ / /_/ / /  / /_/ / / / / / / (__  )         
 /_/  \___/_/ /_/  /_/    \____/_/   \__,_/_/ /_/ /_/ /____/          
     __                   ______      ____          __                
-   / /   ____  ____ _   / ____/___  / / /__  _____/ /_____  _____    
-  / /   / __ \/ __ `/   / /   / __ \/ / / _ \/ ___/ __/ __ \/ ___/    
+   / /   ____  ______   / ____/___  / / /__  _____/ /_____  _____    
+  / /   / __ \/ __ ` /  / /   / __ \/ / / _ \/ ___/ __/ __ \/ ___/    
  / /___/ /_/ / /_/ /  / /___/ /_/ / / /  __/ /__/ /_/ /_/ / /        
 /_____/\____/\__, /   \____/\____/_/_/\___/\___/\__/\____/_/         
             /____/                                                      
@@ -156,7 +157,7 @@
 
 		Write-Host "Launching Elevated Script..."
 
-		Try { $elevated_script = Start-Process Powershell.exe -ArgumentList """-ExecutionPolicy"" ""Bypass"" ""-NonInteractive"" ""-File"" ""$scriptdir\elevated.ps1""" -Verb RunAs -PassThru }
+		Try { $elevated_script = Start-Process Powershell.exe -ArgumentList """-ExecutionPolicy"" ""Bypass"" ""-NonInteractive"" ""-NoProfile"" ""-File"" ""$scriptdir\elevated.ps1""" -Verb RunAs -PassThru }
 
 		Catch {
 
@@ -244,11 +245,11 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 
 	Write-Host "Getting Hardware Information..."
 	
-	Get-WmiObject Win32_PhysicalMemory 2>> $log | Select banklabel, devicelocator, capacity, manufacturer, configuredclockspeed, configuredvoltage | Format-List > "$path\ram.txt"
+	Get-WmiObject Win32_PhysicalMemory 2>> $log | Select DeviceLocator, BankLabel, Manufacturer, Capacity, ConfiguredClockspeed, ConfiguredVoltage, SerialNumber, PartNumber | Format-List > "$path\ram.txt"
 
 # Processor Information
 
-	Get-WmiObject Win32_Processor 2>> $log | Select Name, Description, CurrentClockSpeed, CPUStatus, LastErrorCode, ErrorDescription, PartNumber, Revision, SerialNumber, ProcessorId, Status, StatusInfo, Stepping, CurrentVoltage, VoltageCaps | Format-List > "$path\cpu.txt"
+	Get-WmiObject Win32_Processor 2>> $log | Select Name, Description, Manufacturer, DeviceID, SocketDesignation, CurrentClockSpeed, CPUStatus, LastErrorCode, ErrorDescription, PartNumber, Revision, SerialNumber, ProcessorId, Status, StatusInfo, Stepping, CurrentVoltage, VoltageCaps | Format-List > "$path\cpu.txt"
 
 # Disk and Partition Information
 
@@ -256,7 +257,7 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 
 		Get-Partition 2>> $log | Format-List > "$path\partitions.txt"
 
-		Get-Disk 2>> $log | Select FriendlyName, Model, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, FirmwareVersion, PartitionStyle, Path | Format-List > "$path\disks.txt"
+		Get-Disk 2>> $log | Select FriendlyName, Model, Manufacturer, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, FirmwareVersion, PartitionStyle, Path | Format-List > "$path\disks.txt"
 	}
 
 	Get-WmiObject Win32_LogicalDisk 2>> $log | ForEach-Object {write " $($_.caption) $('{0:N2}' -f ($_.Size/1gb)) GB total, $('{0:N2}' -f ($_.FreeSpace/1gb)) GB free "} >> "$path\disks.txt"
@@ -309,7 +310,7 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 
 	If ( Test-Path "$env:SystemRoot\System32\drivers\etc\hosts" ) {
 
-		Copy-Item -Path "$env:SystemRoot\System32\drivers\etc\hosts" -Destination "$path\hosts.txt"
+		Copy-Item -Path "$env:SystemRoot\System32\drivers\etc\hosts" -Destination "$path\hosts.txt" 2>> $log
 	}
 
 # Wait if dxdiag.exe has not finished, kill process if timeout is reached
