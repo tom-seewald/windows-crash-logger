@@ -72,20 +72,9 @@
 		Write-Warning "This Script Has Not Been Tested On Windows 8, Please Upgrade!"
 	}
 
-# Set variables for output
+# Version String
 
-	$scriptver = "Version alpha004 - 8/21/17"
-	
-	$time = Get-Date
-	$time = $time.ToShortDateString() + " " + $time.ToShortTimeString()
-	$time = $time -Replace ":"," "
-	$time = $time -Replace "/","-"
-	
-	$name = "$env:computername ($time)"
-	$path = "$home\Desktop\$name"
-	$log = "$env:TEMP\script-log.log"
-	$elevatedlog = "$env:TEMP\script-log-elevated.log"
-	$zip = "$path" + ".zip"
+	$scriptver = "Version alpha004 - 8/22/17"
 
 # User Banner
 
@@ -113,6 +102,19 @@
 	Read-Host -Prompt "Press Enter To Continue"
 
 	clear
+
+# Set variables for output folders
+
+	$time = Get-Date
+	$time = $time.ToShortDateString() + " " + $time.ToShortTimeString()
+	$time = $time -Replace ":"," "
+	$time = $time -Replace "/","-"
+	
+	$name = "$env:computername ($time)"
+	$path = "$home\Desktop\$name"
+	$log = "$env:TEMP\script-log.log"
+	$elevatedlog = "$env:TEMP\script-log-elevated.log"
+	$zip = "$path" + ".zip"
 
 # Store the path so elevated.ps1 can retrieve it, elevated.ps1 may run under a different account or during a time change
 
@@ -235,40 +237,63 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 
 	powercfg.exe /list > "$path\power-plan.txt" 2>> $log
 
-# System serial/product number
-
-	Write-Host "Looking Up Serial Number..."
-
-	(Get-WmiObject Win32_Bios).SerialNumber > "$path\serial.txt" 2>> $log
-
 # RAM info
 
 	Write-Host "Getting Hardware Information..."
 	
-	Get-WmiObject Win32_PhysicalMemory 2>> $log | Select DeviceLocator, BankLabel, Manufacturer, Capacity, ConfiguredClockspeed, ConfiguredVoltage, SerialNumber, PartNumber | Format-List > "$path\ram.txt"
+	Get-WmiObject Win32_PhysicalMemory 2>> $log | Select-Object BankLabel, DeviceLocator, Manufacturer, Capacity, ConfiguredClockspeed, ConfiguredVoltage, SerialNumber, PartNumber | Format-List > "$path\ram.txt"
 
 # Processor Information
 
-	Get-WmiObject Win32_Processor 2>> $log | Select Name, Description, Manufacturer, DeviceID, SocketDesignation, CurrentClockSpeed, CPUStatus, LastErrorCode, ErrorDescription, PartNumber, Revision, SerialNumber, ProcessorId, Status, StatusInfo, Stepping, CurrentVoltage, VoltageCaps | Format-List > "$path\cpu.txt"
+	Get-WmiObject Win32_Processor 2>> $log | Select-Object Name, Description, Manufacturer, DeviceID, SocketDesignation, CurrentClockSpeed, CPUStatus, LastErrorCode, ErrorDescription, PartNumber, Revision, SerialNumber, ProcessorId, Status, StatusInfo, Stepping, CurrentVoltage, VoltageCaps | Format-List > "$path\cpu.txt"
 
 # Disk and Partition Information
+	
+	$DiskInfoCode=@'
 
+Public Class DiskInfo
+	Private Declare Function QueryDosDevice Lib "kernel32" Alias "QueryDosDeviceA" (ByVal lpDeviceName As String, ByVal lpTargetPath As String, ByVal ucchMax As Long) As Long
+		
+	Shared Function GetDeviceName(sDisk As String) As String
+		
+		Dim sDevice As String = New String(" ",50)
+			
+		If QueryDosDevice(sDisk, sDevice, sDevice.Length) Then
+			Return sDevice
+				
+		Else
+			Throw New System.Exception("sDisk value not found - not a disk.")
+				
+		End If	
+	End Function
+End Class
+
+'@
+
+	Add-Type $DiskInfoCode -Language VisualBasic
+
+	$SizeGB = @{Name="Size (GB)";Expression={[math]::truncate($_.Capacity / 1GB)}}
+
+	$FreeGB = @{Name="Free (GB)";Expression={[math]::truncate($_.FreeSpace / 1GB)}}
+
+	$DevicePath = @{Name="Device Path";Expression={[diskinfo]::GetDeviceName($_.DriveLetter)}}
+
+	Get-WmiObject Win32_Volume 2>> $log | Where { $_.DriveLetter -ne $null } | Select-Object DriveLetter, $SizeGB, $FreeGB, $DevicePath | Sort-Object DriveLetter | Format-Table -AutoSize > "$path\partitions.txt"
+	
 	If ( $vernum -ge "10.0" ) {
 
-		Get-Partition 2>> $log | Format-List > "$path\partitions.txt"
+		Get-Partition 2>> $log | Format-List >> "$path\partitions.txt"
 
-		Get-Disk 2>> $log | Select FriendlyName, Model, Manufacturer, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, FirmwareVersion, PartitionStyle, Path | Format-List > "$path\disks.txt"
+		Get-Disk 2>> $log | Select-Object FriendlyName, Model, Manufacturer, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, FirmwareVersion, PartitionStyle, Path | Format-List > "$path\disks.txt"
 	}
-
-	Get-WmiObject Win32_LogicalDisk 2>> $log | ForEach-Object {write " $($_.caption) $('{0:N2}' -f ($_.Size/1gb)) GB total, $('{0:N2}' -f ($_.FreeSpace/1gb)) GB free "} >> "$path\disks.txt"
 	
 # System Board Information
 
-	Get-WmiObject Win32_BaseBoard 2>> $log | Select Product, Model, Version, Manufacturer, Description > "$path\motherboard.txt"
+	Get-WmiObject Win32_BaseBoard 2>> $log | Select-Object Product, Model, Version, Manufacturer, Description | Format-List > "$path\motherboard.txt"
 
 # GPU Information
 
-	Get-WmiObject Win32_VideoController 2>> $log | Select Name, DeviceID, PNPDeviceID, VideoProcessor, CurrentRefreshRate, VideoModeDescription, AdapterRAM, DriverVersion, InfFilename, InstalledDisplayDrivers, InstallDate, DriverDate, Status, StatusInfo, LastErrorCode, ErrorDescription | Format-List > "$path\gpu.txt"
+	Get-WmiObject Win32_VideoController 2>> $log | Select-Object Name, DeviceID, PNPDeviceID, VideoProcessor, CurrentRefreshRate, VideoModeDescription, AdapterRAM, DriverVersion, InfFilename, InstalledDisplayDrivers, InstallDate, DriverDate, Status, StatusInfo, LastErrorCode, ErrorDescription | Format-List > "$path\gpu.txt"
 	
 # Windows license information
 
@@ -280,14 +305,14 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 
 	Write-Host "Listing Installed Software..."
 
-	Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher | Sort-Object DisplayName | Format-Table -AutoSize > "$path\installed-software.txt"
+	Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Sort-Object DisplayName | Format-Table -AutoSize > "$path\installed-software.txt"
 
 	If ( Test-Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall" ) {
 
 		echo "`n" >> "$path\installed-software.txt"
 		echo "32-bit Software" >> "$path\installed-software.txt"
 
-		Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher | Sort-Object DisplayName | Format-Table -AutoSize >> "$path\installed-software.txt"
+		Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Sort-Object DisplayName | Format-Table -AutoSize >> "$path\installed-software.txt"
 	}
 
 # Installed Windows Updates
@@ -327,7 +352,7 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 		waitloop $msinfo32 msinfo32.exe 120 "$path\info.nfo"
 	}
 
-# Wait if the elevated script has not finished, include timeout and kill process if timeout is reached, .HasExited on a PowerShell script appears to be broken on PowerShell v2
+# Wait if the elevated script has not finished, kill process if timeout is reached
 
 	If ( $elevated_script -ne $null ) {
 
@@ -346,13 +371,72 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 		Move-Item "$log" -Destination "$path"
 	}
 
-# Compress folder, use native cmdlet or native function if PowerShell supports it
+# Compress folder, use 7-Zip by default for better compression.  Fall-back to the Native compression cmdlet if anything goes wrong
 
-	If ( $vernum -ge "10.0" ) {
+	If ( Test-Path "$scriptdir\7za.exe" ) {
+	
+		Try {
+
+			Write-Host "Compressing folder with 7-Zip (Licensed under the LGPL - www.7-zip.org)..."
+
+			Start-Process -FilePath "$scriptdir\7za.exe" -ArgumentList """a"" ""-tzip"" ""$zip"" ""$path\*""" -NoNewWindow -Wait -RedirectStandardOutput NUL
+
+			$compression = $?
+		}
+		
+		Catch {
+		
+			If ( $vernum -ge "10.0" ) {
+
+				Try {
+
+					Write-Host "7-Zip Failed, Compressing Folder With Compress-Archive..."
+
+					Compress-Archive -Path "$path\*" -DestinationPath "$zip"
+
+					$compression = $?
+				}
+
+				Catch {
+
+					Write-Warning "Failed to compress the folder with native cmdlet!"
+
+					If ( Test-Path "$zip" ) { Remove-Item "$zip" }
+			
+					$compression = False
+				}	
+			}
+	
+			ElseIf ( $PSVersionTable.PSVersion.Major -ge "3" -and $PSVersionTable.CLRVersion.Major -ge "4" ) {
+
+				Try {
+
+					Write-Host "7-Zip Failed, Compressing Folder With System.IO.Compression..."
+
+					Add-Type -Assembly "system.io.compression.filesystem"
+
+					[io.compression.zipfile]::CreateFromDirectory("$path","$zip")
+
+					$compression = $?
+				}
+
+				Catch {
+
+					Write-Warning "Failed to compress the folder with native cmdlet!"
+
+					If ( Test-Path "$zip" ) { Remove-Item "$zip" }
+			
+					$compression = False
+				}
+			}
+		}
+	}
+
+	ElseIf ( $vernum -ge "10.0" ) {
 
 		Try {
 
-			Write-Host "Compressing folder..."
+			Write-Host "7-Zip Not Found, Compressing Folder With Compress-Archive..."
 
 			Compress-Archive -Path "$path\*" -DestinationPath "$zip"
 
@@ -365,33 +449,17 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 
 		 	If ( Test-Path "$zip" ) { Remove-Item "$zip" }
 			
-			If ( Test-Path "$scriptdir\7za.exe" ) {
-
-				Write-Host "Compressing folder with 7-Zip (Licensed under the LGPL - www.7-zip.org)..."
-
-				Start-Process -FilePath "$scriptdir\7za.exe" -ArgumentList """a"" ""-tzip"" ""$zip"" ""$path\*""" -NoNewWindow -Wait -RedirectStandardOutput NUL
-
-				$compression = $?
-			}
-			
-			Else {
-			
-				Write-Warning "$scriptdir\7za.exe not found"
-				Write-Warning "Skipping Compression..."
-
-				$compression = "False"
-			}
-		}
-
+			$compression = False
+		}	
 	}
-
+	
 	ElseIf ( $PSVersionTable.PSVersion.Major -ge "3" -and $PSVersionTable.CLRVersion.Major -ge "4" ) {
 
 		Try {
 
-			Write-Host "Compressing folder with system.io.compression..."
+			Write-Host "7-Zip Not Found, Compressing Folder With System.IO.Compression..."
 
-			Add-Type -assembly "system.io.compression.filesystem"
+			Add-Type -Assembly "system.io.compression.filesystem"
 
 			[io.compression.zipfile]::CreateFromDirectory("$path","$zip")
 
@@ -404,40 +472,8 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 
 		 	If ( Test-Path "$zip" ) { Remove-Item "$zip" }
 			
-			If ( Test-Path "$scriptdir\7za.exe" ) {
-
-				Write-Host "Compressing folder with 7-Zip (Licensed under the LGPL - www.7-zip.org)..."
-
-				Start-Process -FilePath "$scriptdir\7za.exe" -ArgumentList """a"" ""-tzip"" ""$zip"" ""$path\*""" -NoNewWindow -Wait -RedirectStandardOutput NUL
-
-				$compression = $?
-			}
-			
-			Else {
-			
-				Write-Warning "$scriptdir\7za.exe not found"
-				Write-Warning "Skipping Compression..."
-
-				$compression = "False"
-			}
+			$compression = False
 		}
-	}
-
-	ElseIf ( Test-Path "$scriptdir\7za.exe" ) {
-
-			Write-Host "Compressing folder with 7-Zip (Licensed under the LGPL - www.7-zip.org)..."
-
-			Start-Process -FilePath "$scriptdir\7za.exe" -ArgumentList """a"" ""-tzip"" ""$zip"" ""$path\*""" -NoNewWindow -Wait -RedirectStandardOutput NUL
-
-			$compression = $?
-		}
-		
-	Else {
-			
-		Write-Warning "$scriptdir\7za.exe not found"
-		Write-Warning "Skipping Compression..."
-
-		$compression = "False"
 	}
 
 	Write-Host "`n"

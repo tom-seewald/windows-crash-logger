@@ -1,4 +1,4 @@
-# Set output for logging
+# Set output file for logging
 
 	$elevatedlog = "$env:TEMP\script-log-elevated.log"
 
@@ -30,16 +30,28 @@
 
 	$Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size (1000,1000)
 
-# Get output path from main.ps1
+# Get output path from main.ps1, verify it is a valid path before continuing
 
 	If ( !(Test-Path "$env:SystemRoot\Temp\path.txt") ) { 
 
-		Write-Warning "$env:SystemRoot\Temp\path.txt does not exist! exiting..."
+		Write-Warning "$env:SystemRoot\Temp\path.txt does not exist! Exiting..."
 		echo "$env:SystemRoot\Temp\path.txt does not exist. Script aborted!" >> $elevatedlog
 		exit
 	}
 
 	$path = Get-Content "$env:SystemRoot\Temp\path.txt"
+	
+	If ( !(Test-Path "$path") ) {
+	
+		Write-Warning "$env:SystemRoot\Temp\path.txt does not contain a valid file path!"
+		Write-Warning "Aborting script!"
+		
+		echo "$env:SystemRoot\Temp\path.txt does not contain a valid filepath! Script aborted!" >> $elevatedlog
+		echo "$path" >> $elevatedlog
+		Remove-Item "$env:SystemRoot\Temp\path.txt" > $null 2>> $elevatedlog
+
+		exit
+	}
 
 	Remove-Item "$env:SystemRoot\Temp\path.txt" > $null 2>> $elevatedlog
 
@@ -51,7 +63,7 @@
 
 			Write-Host "Copying Crash Dumps..."
 
-			Get-ChildItem -Path "$env:SystemRoot\Minidump" | Sort-Object $_.LastWriteTime | Select -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$path\Crash Dumps" } 2>> $elevatedlog
+			Get-ChildItem -Path "$env:SystemRoot\Minidump" | Sort-Object $_.LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$path\Crash Dumps" } 2>> $elevatedlog
 		}
 
 		Else {
@@ -69,7 +81,7 @@
 		 echo "The folder $env:SystemRoot\Minidump does not exist." >> "$path\Crash Dumps\no-mini-crash-dumps.txt"
 	}
 
-# Check if a full/kernel/active memory dump exists, notify accordingly
+# Check if a full/kernel/active memory dump exists
 
 	If ( Test-Path "$env:SystemRoot\MEMORY.DMP" ) {
 
@@ -83,7 +95,7 @@
 		echo "MEMORY.DMP was not found in $env:SystemRoot" > "$path\Crash Dumps\no-memory.dmp.txt"
 	}
 
-# Gather an Energy/Power Report, only supported on 8.1 and newer
+# Gather a System Power Report, only supported on 8.1 and newer
 
 	If ($vernum -ge "6.3") {
 
@@ -96,16 +108,16 @@
 
 	If ( $vernum -eq "6.3" ) {
 
-		Get-Partition 2>> $log | Format-List > "$path\partitions.txt"
+		Get-Partition 2>> $elevatedlog | Format-List > "$path\partitions.txt"
 
-		Get-Disk 2>> $log | Select FriendlyName, Model, Manufacturer, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, FirmwareVersion, PartitionStyle, Path | Format-List >> "$path\disks.txt"																	 "$path\disks.txt"
+		Get-Disk 2>> $elevatedlog | Select-Object FriendlyName, Model, Manufacturer, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, FirmwareVersion, PartitionStyle, Path | Format-List >> "$path\disks.txt"																	 "$path\disks.txt"
 	}
 
 # List all processes
 
 	Write-Host "Enumerating Running Processes..."
 
-	Get-WmiObject Win32_Process 2>> "$adminlog" | Select-Object ProcessId,ProcessName,SessionId,Priority,CommandLine | Sort-Object ProcessName,ProcessId | Format-Table -AutoSize > "$path\processes.txt"
+	Get-WmiObject Win32_Process 2>> $elevatedlog | Select-Object ProcessId,ProcessName,SessionId,Priority,CommandLine | Sort-Object ProcessName,ProcessId | Format-Table -AutoSize > "$path\processes.txt"
 
 # List all services including status and startup type, only Windows 10 has support for listing service StartType via Get-Service
 
@@ -138,13 +150,13 @@
 
 		Write-Host "Finding Auto-Start Entries..."
 
-		# b = boot execute, d = Appinit DLLs, w = winlogon, h = image hijacks, e = explorer add-ons, l = logon, t = scheduled tasks
+		# -a = specify autostart selection, b = boot execute, d = Appinit DLLs, w = winlogon, h = image hijacks, e = explorer add-ons, l = logon, t = scheduled tasks
 	
-		Start-Process -FilePath "$scriptdir\autorunsc.exe" -ArgumentList "-accepteula","-nobanner","-s","-m","-a","bdwhelt" -NoNewWindow -Wait -RedirectStandardOutput "$path\autorun.txt" 2>> "$adminlog"
+		Start-Process -FilePath "$scriptdir\autorunsc.exe" -ArgumentList "-accepteula","-nobanner","-s","-m","-a","bdwhelt" -NoNewWindow -Wait -RedirectStandardOutput "$path\autorun.txt" 2>> $elevatedlog
 	}
 	
 	Else {
 	
 		Write-Warning "$scriptdir\autorunsc.exe not found"
-		echo "$scriptdir\autorunsc.exe not found" >> "$adminlog"
+		echo "$scriptdir\autorunsc.exe not found" >> $elevatedlog
 	}
