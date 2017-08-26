@@ -78,7 +78,7 @@
 
 # Version String
 
-	$scriptver = "Version alpha006 - 8/26/17"
+	$scriptver = "Version alpha007 - 8/26/17"
 
 # User Banner
 
@@ -265,7 +265,7 @@ End Class
 
 	$DevicePath = @{Name="Device Path";Expression={[diskinfo]::GetDeviceName($_.DriveLetter)}}
 
-	Get-WmiObject Win32_Volume 2>> $log | Where { $_.DriveLetter -ne $null } | Select-Object DriveLetter, $SizeGB, $FreeGB, $DevicePath | Sort-Object DriveLetter | Format-Table -AutoSize > "$path\partitions.txt"
+	Get-WmiObject Win32_Volume 2>> $log | Where-Object { $_.DriveLetter -ne $null } | Select-Object DriveLetter, $SizeGB, $FreeGB, $DevicePath | Sort-Object DriveLetter | Format-Table -AutoSize > "$path\partitions.txt"
 	
 	If ( $vernum -ge "10.0" ) {
 
@@ -294,13 +294,13 @@ End Class
 
 	Write-Host "Listing Installed Software..."
 
-	Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | Sort-Object DisplayName | Format-Table -AutoSize > "$path\installed-software.txt"
+	Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | Sort-Object DisplayName | Format-Table -AutoSize > "$path\installed-software.txt"
 
 	If ( Test-Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall" ) {
 
 		echo "32-bit Software" >> "$path\installed-software.txt"
 
-		Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | Format-Table -AutoSize | Format-Table -AutoSize >> "$path\installed-software.txt"
+		Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | Format-Table -AutoSize | Format-Table -AutoSize >> "$path\installed-software.txt"
 	}
 
 # Installed Windows Updates
