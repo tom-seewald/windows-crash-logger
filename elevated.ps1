@@ -1,3 +1,7 @@
+##############################
+# Script Written By Spectrum #
+##############################
+
 # Set output file for logging
 
 	$elevatedlog = "$env:TEMP\script-log-elevated.log"
@@ -48,69 +52,192 @@
 		
 		echo "$env:SystemRoot\Temp\path.txt does not contain a valid filepath! Script aborted!" >> $elevatedlog
 		echo "$path" >> $elevatedlog
+
 		Remove-Item "$env:SystemRoot\Temp\path.txt" > $null 2>> $elevatedlog
 
 		exit
 	}
 
 	Remove-Item "$env:SystemRoot\Temp\path.txt" > $null 2>> $elevatedlog
+	
+# Get crash dump settings and append crash dump type matrix
 
-# Copy Crash Dumps
+	Write-Host "Getting Crash Dump Settings..."
 
-	If ( Test-Path "$env:SystemRoot\Minidump" ) {
+	echo "########################## Crash Dump Settings #########################" > "$path\Crash Dumps\crash-dump-settings.txt"
 
-		If ( $(Get-ChildItem "$env:SystemRoot\Minidump") -ne $null ) {
+	Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl" >> "$path\Crash Dumps\crash-dump-settings.txt" 2>> $elevatedlog
 
-			Write-Host "Copying Crash Dumps..."
+echo "######################## Crash Dump Type Matrix ########################
 
-			Get-ChildItem -Path "$env:SystemRoot\Minidump" | Sort-Object $_.LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$path\Crash Dumps" } 2>> $elevatedlog
+
+		CrashDumpEnabled			FilterPages
+Disabled	0					<does not exist>
+Complete	1					<does not exist>
+Active		1					1
+Kernel		2					<does not exist>
+Small		3					<does not exist>
+Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
+
+# Copy mini crash dumps
+
+	$minidump_path = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl").MinidumpDir
+
+	$default_path = "$env:SystemRoot\Minidump"
+	
+	If ( $default_path -eq $minidump_path ) {
+	
+		If ( Test-Path "$minidump_path" ) {
+
+			If ( $(Get-ChildItem "$minidump_path") -ne $null ) {
+
+				Write-Host "Copying Crash Dumps from $minidump_path..."
+
+				Get-ChildItem -Path "$minidump_path" | Sort-Object $_.LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$path\Crash Dumps" } 2>> $elevatedlog
+			}
+
+			Else {
+			
+				Write-Host "No Crash Dumps To Copy From $minidump_path"
+
+				echo "$minidump_path is empty." >> "$path\Crash Dumps\mini-crash-dumps.txt"
+			}
+		}
+		
+		Else {
+		
+			Write-Host "No Crash Dumps To Copy From $minidump_path"
+		
+			echo "$minidump_path does not exist." >> "$path\Crash Dumps\mini-crash-dumps.txt"
+		}
+	}
+	
+	# If they paths in the registry and the normal minidump path differ, check both paths for crash dumps and copy the 5 newest
+	
+	Else {
+	
+		# If the registry path exists and is not empty, copy the 5 newest crash dumps
+	
+		If ( Test-Path "$minidump_path" ) {
+
+			If ( $(Get-ChildItem "$minidump_path") -ne $null ) {
+
+				Write-Host "Copying Crash Dumps from $minidump_path..."
+
+				Get-ChildItem -Path "$minidump_path" | Sort-Object $_.LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$path\Crash Dumps" } 2>> $elevatedlog
+			}
+
+			Else {
+			
+				Write-Host "No Crash Dumps To Copy From $minidump_path"
+
+				echo "$minidump_path is empty." >> "$path\Crash Dumps\mini-crash-dumps.txt"
+			}
+		}
+		
+		Else {
+		
+			Write-Host "No Crash Dumps To Copy From $minidump_path"
+		
+			echo "$minidump_path does not exist." >> "$path\Crash Dumps\mini-crash-dumps.txt"
+		}
+		
+		If ( Test-Path "$default_path" ) {
+
+			If ( $(Get-ChildItem "$default_path") -ne $null ) {
+
+				Write-Host "Copying Crash Dumps from $minidump_path..."
+
+				Get-ChildItem -Path "$default_path"  | Sort-Object $_.LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$path\Crash Dumps" } 2>> $elevatedlog
+			}
+
+			Else {
+			
+				Write-Host "No Crash Dumps To Copy From $default_path"
+
+				echo "$default_path  is empty." >> "$path\Crash Dumps\mini-crash-dumps.txt"
+			}
+		}
+		
+		Else {
+		
+			Write-Host "No Crash Dumps To Copy From $default_path"
+		
+			echo "$default_path does not exist." >> "$path\Crash Dumps\mini-crash-dumps.txt"
+		}
+	}
+
+# Check if a full/kernel/active memory dump exists in the default location and the one specified in the registry
+
+	$dump_path = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl").DumpFile
+	
+	If ( $dump_path -eq "$env:SystemRoot\Memory.dmp" ) {
+
+		If ( Test-Path "$dump_path" ) {
+
+			echo "Crash dump found at $dump_path" > "$path\Crash Dumps\memory-dumps.txt"
+			echo "Creation date: $((Get-Item "$dump_path").LastWriteTime)" >> "$path\Crash Dumps\memory-dumps.txt"
+			echo "Size on disk: $([math]::truncate((Get-Item $dump_path).Length / 1MB)) MB" >> "$path\Crash Dumps\memory-dumps.txt"
 		}
 
 		Else {
 
-			 Write-Host "No Crash Dumps To Copy"
-
-			 echo "$env:SystemRoot\Minidump is empty." >> "$path\Crash Dumps\no-mini-crash-dumps.txt"
+			echo "$dump_path was not found" >> "$path\Crash Dumps\memory-dumps.txt"
 		}
-	} 
-
-	Else {
-
-		 Write-Host "No Crash Dumps To Copy"
-
-		 echo "The folder $env:SystemRoot\Minidump does not exist." >> "$path\Crash Dumps\no-mini-crash-dumps.txt"
 	}
-
-# Check if a full/kernel/active memory dump exists
-
-	If ( Test-Path "$env:SystemRoot\MEMORY.DMP" ) {
-
-		echo "Crash dump found at $env:SystemRoot\MEMORY.DMP" > "$path\Crash Dumps\memory.dmp-exists.txt"
-		echo "Creation date: $((Get-Item $env:SystemRoot\MEMORY.DMP).LastWriteTime)" >> "$path\Crash Dumps\memory.dmp-exists.txt"
-		echo "Size on disk: $([math]::truncate((Get-Item $env:SystemRoot\MEMORY.DMP).Length / 1MB)) MB" >> "$path\Crash Dumps\memory.dmp-exists.txt"
-	}
-
+	
 	Else {
+	
+		If ( Test-Path "$dump_path" ) {
 
-		echo "MEMORY.DMP was not found in $env:SystemRoot" > "$path\Crash Dumps\no-memory.dmp.txt"
+			echo "Crash dump found at $dump_path" > "$path\Crash Dumps\memory-dumps.txt"
+			echo "Creation date: $((Get-Item "$dump_path").LastWriteTime)" >> "$path\Crash Dumps\memory-dumps.txt"
+			echo "Size on disk: $([math]::truncate((Get-Item $dump_path).Length / 1MB)) MB" >> "$path\Crash Dumps\memory-dumps.txt"
+		}
+
+		Else {
+
+			echo "$dump_path was not found" >> "$path\Crash Dumps\memory-dumps.txt"
+		}
+		
+		If ( Test-Path "$env:SystemRoot\Memory.dmp" ) {
+		
+			echo "Crash dump found at $env:SystemRoot\Memory.dmp" >> "$path\Crash Dumps\memory-dumps.txt"
+			echo "Creation date: $((Get-Item $env:SystemRoot\MEMORY.DMP).LastWriteTime)" >> "$path\Crash Dumps\memory-dumps.txt"
+			echo "Size on disk: $([math]::truncate((Get-Item "$env:SystemRoot\Memory.dmp").Length / 1MB)) MB" >> "$path\Crash Dumps\memory-dumps.txt"
+		}
+		
+		Else {
+		
+			echo "$env:SystemRoot\Memory.dmp was not found" >> "$path\Crash Dumps\memory-dumps.txt"
+		}
+	}
+	
+# List contents of LiveKernelReports directory if it exists and is not empty
+
+	If ( $(Test-Path "$env:SystemRoot\LiveKernelReports") -eq $True -and $(Get-ChildItem -Path "$env:SystemRoot\LiveKernelReports" ) -ne $null ) {
+
+		$LengthMB = @{Name="Size (MB)";Expression={[math]::Round($_.Length / 1MB, 2)}}
+
+		Get-ChildItem -Path "$env:SystemRoot\LiveKernelReports" 2>> $elevatedlog | Select-Object Name,LastWriteTime,$LengthMB > "$path\Crash Dumps\live-kernel-reports.txt"
 	}
 
 # Gather a System Power Report, only supported on 8.1 and newer
 
-	If ($vernum -ge "6.3") {
+	If ( $vernum -ge "6.3" ) {
 
 		Write-Host "Running System Power Report..."
 
 		powercfg.exe /sleepstudy /output "$path\power-report.html" > $null 2>> $elevatedlog
 	}
 
-# Disk and Partition Information, 8.1 requires admin rights unlike 10
+# Disk and partition information, 8.1 requires admin rights unlike 10
 
 	If ( $vernum -eq "6.3" ) {
 
-		Get-Partition 2>> $elevatedlog | Format-List > "$path\partitions.txt"
+		Get-Partition 2>> $elevatedlog | Format-List >> "$path\partitions.txt"
 
-		Get-Disk 2>> $elevatedlog | Select-Object FriendlyName, Model, Manufacturer, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, FirmwareVersion, PartitionStyle, Path | Format-List >> "$path\disks.txt"																	 "$path\disks.txt"
+		Get-Disk 2>> $elevatedlog | Select-Object FriendlyName, Model, Manufacturer, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, BusType, FirmwareVersion, PartitionStyle, Path | Format-List >> "$path\disks.txt"																	 "$path\disks.txt"
 	}
 
 # List all processes

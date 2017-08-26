@@ -1,3 +1,7 @@
+##############################
+# Script Written By Spectrum #
+##############################
+
 # If the OS is 64-bit and this script was launched with 32-bit PowerShell, relaunch with 64-bit PowerShell and exit the current instance
 
 	If ( [Environment]::Is64BitOperatingSystem -eq $True -and [Environment]::Is64BitProcess -eq $False ) {
@@ -74,7 +78,7 @@
 
 # Version String
 
-	$scriptver = "Version alpha004 - 8/22/17"
+	$scriptver = "Version alpha006 - 8/25/17"
 
 # User Banner
 
@@ -130,7 +134,7 @@
 
 	If ( Test-path "$elevatedlog" ) { Remove-Item "$elevatedlog" }
 
-# Create Directories
+# Create directories
 
 	New-Item -ItemType Directory "$path" -Force -ErrorAction Stop > $null 2>> $log
 
@@ -144,7 +148,7 @@
 
 	Write-Host "Generating System Information Report, this may take a while..."
 
-	Try { $msinfo32 = Start-Process msinfo32.exe -ArgumentList """/nfo"" ""$path\info.nfo""" -PassThru }
+	Try { $msinfo32 = Start-Process msinfo32.exe -ArgumentList """/nfo"" ""$path\msinfo32.nfo""" -PassThru }
 
 	Catch {
 
@@ -153,7 +157,7 @@
 		echo $error[0] >> $log
 	}
 
-# Start Elevated Script
+# Start Elevated.ps1 asynchronously
 
 	If ( Test-Path "$scriptdir\elevated.ps1" ) {
 
@@ -179,7 +183,7 @@
 		If ( Test-Path "$env:SystemRoot\Temp\path.txt" ) { Remove-Item "$env:SystemRoot\Temp\path.txt" }
 	}
 
-# DirectX Diagnostics Report
+# Start DirectX Diagnostics Report
 
 	Write-Host "Running DirectX Diagnostics..."
 
@@ -192,24 +196,7 @@
 		echo $error[0] >> $log
 	}
 
-# Get crash dump settings and append crash dump type matrix
-
-	echo "########################## Crash Dump Settings #########################" > "$path\Crash Dumps\crash-dump-settings.txt"
-
-	Get-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl >> "$path\Crash Dumps\crash-dump-settings.txt" 2>> $log
-
-echo "######################## Crash Dump Type Matrix ########################
-
-
-		CrashDumpEnabled			FilterPages
-Disabled	0					<does not exist>
-Complete	1					<does not exist>
-Active		1					1
-Kernel		2					<does not exist>
-Small		3					<does not exist>
-Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
-
-# Export Event Logs (1209600000ms = 14 days, 604800000ms = 7 days)
+# Export Event Logs (604800000ms = 7 days)
 
 	Write-Host "Exporting Application Event Log..."
 
@@ -243,11 +230,11 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 	
 	Get-WmiObject Win32_PhysicalMemory 2>> $log | Select-Object BankLabel, DeviceLocator, Manufacturer, Capacity, ConfiguredClockspeed, ConfiguredVoltage, SerialNumber, PartNumber | Format-List > "$path\ram.txt"
 
-# Processor Information
+# Processor information
 
 	Get-WmiObject Win32_Processor 2>> $log | Select-Object Name, Description, Manufacturer, DeviceID, SocketDesignation, CurrentClockSpeed, CPUStatus, LastErrorCode, ErrorDescription, PartNumber, Revision, SerialNumber, ProcessorId, Status, StatusInfo, Stepping, CurrentVoltage, VoltageCaps | Format-List > "$path\cpu.txt"
 
-# Disk and Partition Information
+# Disk and partition information
 	
 	$DiskInfoCode=@'
 
@@ -272,9 +259,9 @@ End Class
 
 	Add-Type $DiskInfoCode -Language VisualBasic
 
-	$SizeGB = @{Name="Size (GB)";Expression={[math]::truncate($_.Capacity / 1GB)}}
+	$SizeGB = @{Name="Size (GB)";Expression={[math]::Round($_.Capacity / 1GB, 2)}}
 
-	$FreeGB = @{Name="Free (GB)";Expression={[math]::truncate($_.FreeSpace / 1GB)}}
+	$FreeGB = @{Name="Free (GB)";Expression={[math]::Round($_.FreeSpace / 1GB, 2)}}
 
 	$DevicePath = @{Name="Device Path";Expression={[diskinfo]::GetDeviceName($_.DriveLetter)}}
 
@@ -284,14 +271,14 @@ End Class
 
 		Get-Partition 2>> $log | Format-List >> "$path\partitions.txt"
 
-		Get-Disk 2>> $log | Select-Object FriendlyName, Model, Manufacturer, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, FirmwareVersion, PartitionStyle, Path | Format-List > "$path\disks.txt"
+		Get-Disk 2>> $log | Select-Object FriendlyName, Model, Manufacturer, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, BusType, FirmwareVersion, PartitionStyle, Path | Format-List > "$path\disks.txt"
 	}
 	
-# System Board Information
+# System Board information
 
 	Get-WmiObject Win32_BaseBoard 2>> $log | Select-Object Product, Model, Version, Manufacturer, Description | Format-List > "$path\motherboard.txt"
 
-# GPU Information
+# GPU information
 
 	Get-WmiObject Win32_VideoController 2>> $log | Select-Object Name, DeviceID, PNPDeviceID, VideoProcessor, CurrentRefreshRate, VideoModeDescription, AdapterRAM, DriverVersion, InfFilename, InstalledDisplayDrivers, InstallDate, DriverDate, Status, StatusInfo, LastErrorCode, ErrorDescription | Format-List > "$path\gpu.txt"
 	
@@ -301,18 +288,18 @@ End Class
 
 	cscript.exe $env:SystemRoot\System32\slmgr.vbs /dlv | Select-Object -Skip 4 > "$path\windows-license-info.txt" 2>> $log
 
-# Installed Software, first check native and then 32-bit (if it exists)
+# Installed software, first check native and then 32-bit (if it exists).  Do not display totally empty lines.
 
 	Write-Host "Listing Installed Software..."
 
-	Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Sort-Object DisplayName | Format-Table -AutoSize > "$path\installed-software.txt"
+	Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | Sort-Object DisplayName | Format-Table -AutoSize > "$path\installed-software.txt"
 
 	If ( Test-Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall" ) {
 
 		echo "`n" >> "$path\installed-software.txt"
 		echo "32-bit Software" >> "$path\installed-software.txt"
 
-		Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Sort-Object DisplayName | Format-Table -AutoSize >> "$path\installed-software.txt"
+		Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | Format-Table -AutoSize | Format-Table -AutoSize >> "$path\installed-software.txt"
 	}
 
 # Installed Windows Updates
@@ -349,7 +336,7 @@ End Class
 
 	If ( $msinfo32 -ne $null ) {
 
-		waitloop $msinfo32 msinfo32.exe 120 "$path\info.nfo"
+		waitloop $msinfo32 msinfo32.exe 120 "$path\msinfo32.nfo"
 	}
 
 # Wait if the elevated script has not finished, kill process if timeout is reached
