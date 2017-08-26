@@ -78,7 +78,7 @@
 
 # Version String
 
-	$scriptver = "Version alpha006 - 8/25/17"
+	$scriptver = "Version alpha006 - 8/26/17"
 
 # User Banner
 
@@ -216,7 +216,7 @@
 
 	driverquery.exe /v /fo table 2>> $log | Select-Object -Skip 1 > "$path\driver-list.txt"
 
-	Get-WmiObject Win32_PnPSignedDriver 2>> $log | Select-Object DeviceName,FriendlyName,DriverVersion,DriverDate | Sort-Object DeviceName | Format-Table -AutoSize > "$path\driver-versions.txt"
+	Get-WmiObject Win32_PnPSignedDriver 2>> $log | Select-Object DeviceName, FriendlyName, InfName, DriverVersion, IsSigned, DriverDate | Where-Object {$_.DeviceName -ne $null -or $_.FriendlyName -ne $null -or $_.InfName -ne $null } | Sort-Object DeviceName | Format-Table -AutoSize > "$path\driver-versions.txt"
 
 # Get Default Power Plan
 
@@ -277,6 +277,8 @@ End Class
 # System Board information
 
 	Get-WmiObject Win32_BaseBoard 2>> $log | Select-Object Product, Model, Version, Manufacturer, Description | Format-List > "$path\motherboard.txt"
+	
+	Get-WmiObject Win32_Bios 2>> $log | Select-Object SMBIOSBIOSVersion, Manufacturer, Name, Version, ReleaseDate | Format-List >> "$path\motherboard.txt"
 
 # GPU information
 
@@ -296,7 +298,6 @@ End Class
 
 	If ( Test-Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall" ) {
 
-		echo "`n" >> "$path\installed-software.txt"
 		echo "32-bit Software" >> "$path\installed-software.txt"
 
 		Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | Format-Table -AutoSize | Format-Table -AutoSize >> "$path\installed-software.txt"
