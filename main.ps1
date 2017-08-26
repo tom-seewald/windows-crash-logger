@@ -271,7 +271,7 @@ End Class
 
 		Get-Partition 2>> $log | Format-List >> "$path\partitions.txt"
 
-		Get-Disk 2>> $log | Select-Object FriendlyName, Model, Manufacturer, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, BusType, FirmwareVersion, PartitionStyle, Path | Format-List > "$path\disks.txt"
+		Get-Disk 2>> $log | Select-Object FriendlyName, Model, Manufacturer, Number, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, BusType, FirmwareVersion, PartitionStyle, Path | Format-List > "$path\disks.txt"
 	}
 	
 # System Board information

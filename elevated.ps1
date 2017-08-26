@@ -237,7 +237,7 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 
 		Get-Partition 2>> $elevatedlog | Format-List >> "$path\partitions.txt"
 
-		Get-Disk 2>> $elevatedlog | Select-Object FriendlyName, Model, Manufacturer, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, BusType, FirmwareVersion, PartitionStyle, Path | Format-List >> "$path\disks.txt"																	 "$path\disks.txt"
+		Get-Disk 2>> $elevatedlog | Select-Object FriendlyName, Model, Manufacturer, Number, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, BusType, FirmwareVersion, PartitionStyle, Path | Format-List >> "$path\disks.txt"																	 "$path\disks.txt"
 	}
 
 # List all processes
