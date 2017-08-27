@@ -306,6 +306,10 @@ End Class
 	echo "User-specific Software" >> "$path\installed-software.txt"
 	
 	Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where-Object {$_.DisplayName -ne $null} | Format-Table -AutoSize >> "$path\installed-software.txt"
+	
+	echo "Installed Windows Components" >> "$path\installed-software.txt"
+	
+	Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\*" 2>> $log | Select-Object "(Default)", ComponentID, Version, Enabled | Where-Object {$_."(Default)" -ne $null -or $_.ComponentID -ne $null} | Sort-Object @{Expression = "Enabled"; Descending = $True}, "(default)" | Format-Table -AutoSize >> "$path\installed-software.txt"
 
 # Installed Windows Updates
 
