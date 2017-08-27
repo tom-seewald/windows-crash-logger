@@ -273,13 +273,31 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 		Copy-Item -Recurse "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportArchive\*" -Destination "$path\Error Reports" > $null 2>> $elevatedlog
 	}
 
-# List all autostart entries that are not cryptographically signed by Microsoft (-s -m)
+# Download and run autorunsc.exe
+
+	Try {
+	
+		$autorunsurl = "http://live.sysinternals.com/autorunsc.exe"
+		
+		$ProgressPreference = 'SilentlyContinue'
+	
+		Write-Host "Downloading autoruns..."
+	
+		Invoke-WebRequest -Uri "$autorunsurl" -OutFile "$scriptdir\autorunsc.exe"
+	}
+	
+	Catch {
+
+		Write-Host "Failed to download autorunsc, skipping..."
+		
+		echo "Failed to download autrunsc" >> $elevatedlog
+	}
 
 	If ( Test-Path "$scriptdir\autorunsc.exe" ) {
 
 		Write-Host "Finding Auto-Start Entries..."
 
-		# -a = specify autostart selection, b = boot execute, d = Appinit DLLs, w = winlogon, h = image hijacks, e = explorer add-ons, l = logon, t = scheduled tasks
+		# -s -m List all autostart entries that are not cryptographically signed by Microsoft, -a = specify autostart selection, b = boot execute, d = Appinit DLLs, w = winlogon, h = image hijacks, e = explorer add-ons, l = logon, t = scheduled tasks
 	
 		Start-Process -FilePath "$scriptdir\autorunsc.exe" -ArgumentList "-accepteula","-nobanner","-s","-m","-a","bdwhelt" -NoNewWindow -Wait -RedirectStandardOutput "$path\autorun.txt" 2>> $elevatedlog
 	}
@@ -288,4 +306,9 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 	
 		Write-Warning "$scriptdir\autorunsc.exe not found"
 		echo "$scriptdir\autorunsc.exe not found" >> $elevatedlog
+	}
+	
+	If ( Test-Path "$scriptdir\autorunsc.exe" ) {
+	
+		Remove-Item "$scriptdir\autorunsc.exe"
 	}
