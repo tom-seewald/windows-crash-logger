@@ -281,16 +281,16 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 		
 		$ProgressPreference = 'SilentlyContinue'
 	
-		Write-Host "Downloading autoruns..."
+		Write-Host "Downloading autorunsc..."
 	
 		Invoke-WebRequest -Uri "$autorunsurl" -OutFile "$scriptdir\autorunsc.exe" -TimeoutSec 10
 	}
 	
 	Catch {
 
-		Write-Host "Failed to download autorunsc, skipping..."
+		Write-Warning "Failed To Download autorunsc. Skipping..."
 		
-		echo "Failed to download autrunsc" >> $elevatedlog
+		echo "Failed to download autrunsc." >> $elevatedlog
 	}
 
 	If ( Test-Path "$scriptdir\autorunsc.exe" ) {
@@ -303,9 +303,8 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 	}
 	
 	Else {
-	
-		Write-Warning "$scriptdir\autorunsc.exe not found"
-		echo "$scriptdir\autorunsc.exe not found" >> $elevatedlog
+
+		echo "$scriptdir\autorunsc.exe not found." >> $elevatedlog
 	}
 	
 	If ( Test-Path "$scriptdir\autorunsc.exe" ) {
