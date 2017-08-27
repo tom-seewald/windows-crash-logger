@@ -275,22 +275,52 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 
 # Download and run autorunsc.exe
 
-	Try {
+	$autorunsurl = "http://live.sysinternals.com/autorunsc.exe"
 	
-		$autorunsurl = "http://live.sysinternals.com/autorunsc.exe"
+	Write-Host "Downloading autorunsc..."
+
+	If ( $vernum -ge "6.3" ) {
+
+		Try {
 		
-		$ProgressPreference = 'SilentlyContinue'
+			$ProgressPreference = 'SilentlyContinue'
 	
-		Write-Host "Downloading autorunsc..."
+			Invoke-WebRequest -Uri "$autorunsurl" -OutFile "$scriptdir\autorunsc.exe" -TimeoutSec 10 2>> $elevatedlog
+		}
 	
-		Invoke-WebRequest -Uri "$autorunsurl" -OutFile "$scriptdir\autorunsc.exe" -TimeoutSec 10
+		Catch {
+
+			Write-Warning "Failed To Download autorunsc. Skipping..."
+		
+			echo "Failed to download autrunsc." >> $elevatedlog
+			
+			echo $error[0] >> $elevatedlog
+			
+			If ( Test-Path "$scriptdir\autorunsc.exe" ) { Remove-Item "$scriptdir\autorunsc.exe" }
+		}
 	}
 	
-	Catch {
+	Else {
+	
+		Try {
 
-		Write-Warning "Failed To Download autorunsc. Skipping..."
+			$autorunsurl = "http://live.sysinternals.com/autorunsc.exe"
+
+			$WebClient = New-Object System.Net.WebClient
+	
+			$WebClient.DownloadFile($autorunsurl,"$scriptdir\autorunsc.exe") 2>> $elevatedlog
+		}
 		
-		echo "Failed to download autrunsc." >> $elevatedlog
+		Catch {
+		
+			Write-Warning "Failed To Download autorunsc. Skipping..."
+		
+			echo "Failed to download autrunsc." >> $elevatedlog
+		
+			echo $error[0] >> $elevatedlog
+			
+			If ( Test-Path "$scriptdir\autorunsc.exe" ) { Remove-Item "$scriptdir\autorunsc.exe" }
+		}
 	}
 
 	If ( Test-Path "$scriptdir\autorunsc.exe" ) {
