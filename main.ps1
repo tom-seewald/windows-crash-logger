@@ -78,7 +78,7 @@
 
 # Version String
 
-	$scriptver = "Version alpha007 - 8/26/17"
+	$scriptver = "Version alpha007 - 8/27/17"
 
 # User Banner
 
@@ -290,7 +290,7 @@ End Class
 
 	cscript.exe $env:SystemRoot\System32\slmgr.vbs /dlv | Select-Object -Skip 4 > "$path\windows-license-info.txt" 2>> $log
 
-# Installed software, first check native and then 32-bit (if it exists).  Do not display totally empty lines.
+# Installed software, first check native and then 32-bit (if it exists).
 
 	Write-Host "Listing Installed Software..."
 
@@ -302,6 +302,10 @@ End Class
 
 		Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | Format-Table -AutoSize | Format-Table -AutoSize >> "$path\installed-software.txt"
 	}
+	
+	echo "User-specific Software" >> "$path\installed-software.txt"
+	
+	Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where-Object {$_.DisplayName -ne $null} | Format-Table -AutoSize >> "$path\installed-software.txt"
 
 # Installed Windows Updates
 

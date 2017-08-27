@@ -244,18 +244,20 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 
 	Write-Host "Enumerating Running Processes..."
 
-	Get-WmiObject Win32_Process 2>> $elevatedlog | Select-Object ProcessId,ProcessName,SessionId,Priority,CommandLine | Sort-Object ProcessName,ProcessId | Format-Table -AutoSize > "$path\processes.txt"
+	Get-WmiObject Win32_Process 2>> $elevatedlog | Select-Object ProcessName, ProcessID, SessionId, Priority, CommandLine | Sort-Object ProcessName,ProcessId | Format-Table -AutoSize > "$path\processes.txt"
 
-# List all services including status and startup type, only Windows 10 has support for listing service StartType via Get-Service
+# List all services including status, pid, only Windows 10 has support for listing service StartType via Get-Service
 
 	Write-Host "Identifying Running Services..."
 
 	If ( $vernum -ge "10.0" ) {
-
-		Get-Service 2>> $elevatedlog | Select-Object Status,StartType,Name,DisplayName | Sort-Object -Property @{Expression = "Status"; Descending = $True}, @{Expression = "Name"; Descending = $False} | Format-Table -Autosize > "$path\services.txt"	
+	
+		$StartType = @{Name="StartType";Expression={(Get-Service $_.Name).StartType}}
+		
+		Get-WmiObject Win32_Service 2>> $elevatedlog | Select-Object Name, DisplayName, State, ProcessID, $StartType | Sort-Object State, Name | Format-Table -AutoSize > "$path\services.txt"	
 	}
 
-	Else { Get-Service 2>> $elevatedlog | Select-Object Status,Name,DisplayName | Sort-Object -Property @{Expression = "Status"; Descending = $True}, @{Expression = "Name"; Descending = $False} | Format-Table -Autosize > "$path\services.txt" }
+	Else { Get-WmiObject Win32_Service 2>> $elevatedlog | Select-Object Name, DisplayName, State, ProcessID | Sort-Object State, Name | Format-Table -AutoSize > "$path\services.txt" }
 
 # Copy Windows Error Reports
 
