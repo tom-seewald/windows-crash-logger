@@ -283,7 +283,7 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 	
 		Write-Host "Downloading autoruns..."
 	
-		Invoke-WebRequest -Uri "$autorunsurl" -OutFile "$scriptdir\autorunsc.exe"
+		Invoke-WebRequest -Uri "$autorunsurl" -OutFile "$scriptdir\autorunsc.exe" -TimeoutSec 10
 	}
 	
 	Catch {
