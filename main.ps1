@@ -78,7 +78,7 @@
 
 # Version String
 
-	$scriptver = "Version alpha007 - 8/27/17"
+	$scriptver = "Version alpha008 - 9/4/17"
 
 # User Banner
 
@@ -205,6 +205,10 @@
 	Write-Host "Exporting System Event Log..."
 
 	wevtutil.exe query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" /f:text > $path\Events\system-events.txt 2>> $log
+	
+	Write-Host "Exporting Kernel PnP Log..."
+	
+	wevtutil.exe query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" /f:text > $path\Events\pnp-events.txt 2>> $log
 
 	Write-Host "Exporting WHEA Event Log..."
 
@@ -278,7 +282,7 @@ End Class
 
 	Get-WmiObject Win32_BaseBoard 2>> $log | Select-Object Product, Model, Version, Manufacturer, Description | Format-List > "$path\motherboard.txt"
 	
-	Get-WmiObject Win32_Bios 2>> $log | Select-Object SMBIOSBIOSVersion, Manufacturer, Name, Version, ReleaseDate | Format-List >> "$path\motherboard.txt"
+	Get-WmiObject Win32_Bios 2>> $log | Select-Object SMBIOSBIOSVersion, Manufacturer, Name, Version, BIOSVersion, ReleaseDate | Format-List >> "$path\motherboard.txt"
 
 # GPU information
 
@@ -325,13 +329,13 @@ End Class
 
 	route.exe print >> "$path\network-info.txt" 2>> $log
 
-# Copy hosts file
+# Copy relevant entries from the hosts file
 
-	Write-Host "Copying Hosts File..."
+	Write-Host "Examining Hosts File..."
 
 	If ( Test-Path "$env:SystemRoot\System32\drivers\etc\hosts" ) {
 
-		Copy-Item -Path "$env:SystemRoot\System32\drivers\etc\hosts" -Destination "$path\hosts.txt" 2>> $log
+		Get-Content -Path "$env:SystemRoot\System32\drivers\etc\hosts" 2>> $log | Select-String '(127.0.0.1)|(0.0.0.0)' > "$path\hosts.txt"
 	}
 
 # Wait if dxdiag.exe has not finished, kill process if timeout is reached
@@ -479,7 +483,6 @@ End Class
 	If ( "$(Test-Path "$zip")" -eq "True" -and "$compression" -eq "True" ) {
 
 		Remove-Item "$path" -Recurse
-
 		Write-Host "Output location: $zip" 
 	}
 

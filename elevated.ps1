@@ -89,11 +89,11 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 	
 		If ( Test-Path "$minidump_path" ) {
 
-			If ( $(Get-ChildItem "$minidump_path") -ne $null ) {
+			If ( $(Get-ChildItem -Filter "*.dmp" -Path "$minidump_path") -ne $null ) {
 
 				Write-Host "Copying Crash Dumps from $minidump_path..."
 
-				Get-ChildItem -Path "$minidump_path" | Sort-Object $_.LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$path\Crash Dumps" } 2>> $elevatedlog
+				Get-ChildItem -Filter "*.dmp" -Path "$minidump_path" | Sort-Object $_.LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$path\Crash Dumps" } 2>> $elevatedlog
 			}
 
 			Else {
@@ -120,11 +120,11 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 	
 		If ( Test-Path "$minidump_path" ) {
 
-			If ( $(Get-ChildItem "$minidump_path") -ne $null ) {
+			If ( $(Get-ChildItem -Filter "*.dmp" -Path "$minidump_path") -ne $null ) {
 
 				Write-Host "Copying Crash Dumps from $minidump_path..."
 
-				Get-ChildItem -Path "$minidump_path" | Sort-Object $_.LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$path\Crash Dumps" } 2>> $elevatedlog
+				Get-ChildItem -Filter "*.dmp" -Path "$minidump_path" | Sort-Object $_.LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$path\Crash Dumps" } 2>> $elevatedlog
 			}
 
 			Else {
@@ -144,11 +144,11 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 		
 		If ( Test-Path "$default_path" ) {
 
-			If ( $(Get-ChildItem "$default_path") -ne $null ) {
+			If ( $(Get-ChildItem -Filter "*.dmp" -Path "$default_path") -ne $null ) {
 
 				Write-Host "Copying Crash Dumps from $minidump_path..."
 
-				Get-ChildItem -Path "$default_path"  | Sort-Object $_.LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$path\Crash Dumps" } 2>> $elevatedlog
+				Get-ChildItem -Filter "*.dmp" -Path "$default_path"  | Sort-Object $_.LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$path\Crash Dumps" } 2>> $elevatedlog
 			}
 
 			Else {
@@ -257,7 +257,10 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 		Get-WmiObject Win32_Service 2>> $elevatedlog | Select-Object Name, DisplayName, State, ProcessID, $StartType | Sort-Object State, Name | Format-Table -AutoSize > "$path\services.txt"	
 	}
 
-	Else { Get-WmiObject Win32_Service 2>> $elevatedlog | Select-Object Name, DisplayName, State, ProcessID | Sort-Object State, Name | Format-Table -AutoSize > "$path\services.txt" }
+	Else { 
+
+		Get-WmiObject Win32_Service 2>> $elevatedlog | Select-Object Name, DisplayName, State, ProcessID | Sort-Object State, Name | Format-Table -AutoSize > "$path\services.txt"
+	}
 
 # Copy Windows Error Reports
 
