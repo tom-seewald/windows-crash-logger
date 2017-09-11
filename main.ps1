@@ -78,7 +78,7 @@ If ( $vernum -eq 6.2 ) {
 
 # Version String
 
-$scriptver = "Version alpha009 - 9/7/17"
+$scriptver = "Version alpha010 - 9/11/17"
 
 # Startup Banner
 
@@ -196,23 +196,23 @@ Catch {
 	echo $error[0] >> $log
 }
 
-# Export Event Logs (604800000 ms = 7 days)
+# Export Event Logs (2592000000 ms = 30 days)
 
 Write-Host "Exporting Application Event Log..."
 
-wevtutil.exe query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" /f:text > $path\Events\application-events.txt 2>> $log
+wevtutil.exe query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\application-events.txt 2>> $log
 
 Write-Host "Exporting System Event Log..."
 
-wevtutil.exe query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" /f:text > $path\Events\system-events.txt 2>> $log
+wevtutil.exe query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\system-events.txt 2>> $log
 
 Write-Host "Exporting Kernel PnP Log..."
 
-wevtutil.exe query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" /f:text > $path\Events\pnp-events.txt 2>> $log
+wevtutil.exe query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\pnp-events.txt 2>> $log
 
 Write-Host "Exporting WHEA Event Log..."
 
-wevtutil.exe query-events Microsoft-Windows-Kernel-WHEA/Errors /q:"*[System[TimeCreated[timediff(@SystemTime) <= 604800000]]]" /f:text > $path\Events\whea-events.txt 2>> $log
+wevtutil.exe query-events Microsoft-Windows-Kernel-WHEA/Errors /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\whea-events.txt 2>> $log
 
 # Driver information
 
@@ -232,7 +232,7 @@ powercfg.exe /list > "$path\power-plan.txt" 2>> $log
 
 Write-Host "Getting Hardware Information..."
 
-Get-WmiObject Win32_PhysicalMemory 2>> $log | Select-Object BankLabel, DeviceLocator, Manufacturer, Capacity, ConfiguredClockspeed, ConfiguredVoltage, SerialNumber, PartNumber | Format-List > "$path\ram.txt"
+Get-WmiObject Win32_PhysicalMemory 2>> $log | Select-Object BankLabel, DeviceLocator, Manufacturer, Capacity, ConfiguredClockspeed, ConfiguredVoltage, SerialNumber, PartNumber | Sort-Object BankLabel, DeviceLocator | Format-List > "$path\ram.txt"
 
 # Processor information
 
@@ -371,9 +371,7 @@ If ( $(Test-Path "$log") -eq "True" -and (Get-Item "$log").Length -gt 0 ) {
 	Move-Item "$log" -Destination "$path"
 }
 
-# Compress output folder
-
-$ProgressPreference = 'SilentlyContinue'	
+# Compress output folder	
 
 If ( $vernum -ge "10.0" ) {
 
