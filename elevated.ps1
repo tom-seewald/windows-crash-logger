@@ -53,12 +53,12 @@ If ( !(Test-Path "$path") ) {
 	echo "$env:SystemRoot\Temp\path.txt does not contain a valid filepath! Script aborted!" >> $elevatedlog
 	echo "$path" >> $elevatedlog
 
-	Remove-Item "$env:SystemRoot\Temp\path.txt" > $null 2>> $elevatedlog
+	Remove-Item -Force "$env:SystemRoot\Temp\path.txt" > $null 2>> $elevatedlog
 
 	exit
 }
 
-Remove-Item "$env:SystemRoot\Temp\path.txt" > $null 2>> $elevatedlog
+Remove-Item -Force "$env:SystemRoot\Temp\path.txt" > $null 2>> $elevatedlog
 	
 # Get crash dump settings and append crash dump type matrix
 
@@ -85,46 +85,50 @@ $minidump_path = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control
 
 $default_path = "$env:SystemRoot\Minidump"
 	
-	If ( $default_path -eq $minidump_path ) {
+If ( $default_path -eq $minidump_path ) {
+
+	If ( Test-Path "$minidump_path" ) {
 	
-		If ( Test-Path "$minidump_path" ) {
+		Get-ChildItem $minidump_path | Sort-Object LastWriteTime -Descending >> "$path\Crash Dumps\mini-crash-dumps.txt"
 
-			If ( $(Get-ChildItem -Filter "*.dmp" -Path "$minidump_path") -ne $null ) {
+		If ( $(Get-ChildItem -Filter "*.dmp" -Path "$minidump_path") -ne $null ) {
 
-				Write-Host "Copying Crash Dumps from $minidump_path..."
+			Write-Host "Copying Crash Dumps from $minidump_path..."
 
-				Get-ChildItem -Filter "*.dmp" -Path "$minidump_path" | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$path\Crash Dumps" } 2>> $elevatedlog
-			}
-
-			Else {
-			
-				Write-Host "No Crash Dumps To Copy From $minidump_path"
-
-				echo "No Crash Dumps To Copy From $minidump_path." >> "$path\Crash Dumps\mini-crash-dumps.txt"
-			}
+			Get-ChildItem -Filter "*.dmp" -Path "$minidump_path" | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$path\Crash Dumps" } 2>> $elevatedlog
 		}
-		
+
 		Else {
 		
 			Write-Host "No Crash Dumps To Copy From $minidump_path"
-		
-			echo "$minidump_path does not exist." >> "$path\Crash Dumps\mini-crash-dumps.txt"
+
+			echo "No Crash Dumps To Copy From $minidump_path." >> "$path\Crash Dumps\mini-crash-dumps.txt"
 		}
 	}
 	
-	# If they paths in the registry and the default minidump path differ, check both paths for crash dumps and copy the 5 newest
+	Else {
+	
+		Write-Host "No Crash Dumps To Copy From $minidump_path"
+	
+		echo "$minidump_path does not exist." >> "$path\Crash Dumps\mini-crash-dumps.txt"
+	}
+}
+
+# If they paths in the registry and the default minidump path differ, check both paths for crash dumps and copy the 5 newest
 	
 Else {
 
 	# If the registry path exists and is not empty, copy the 5 newest crash dumps
 
 	If ( Test-Path "$minidump_path" ) {
+	
+		Get-ChildItem $minidump_path | Sort-Object LastWriteTime -Descending >> "$path\Crash Dumps\mini-crash-dumps.txt"
 
 		If ( $(Get-ChildItem -Filter "*.dmp" -Path "$minidump_path") -ne $null ) {
 
 			Write-Host "Copying Crash Dumps from $minidump_path..."
 
-			Get-ChildItem -Filter "*.dmp" -Path "$minidump_path" | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$path\Crash Dumps" } 2>> $elevatedlog
+			Get-ChildItem -Filter "*.dmp" -Path "$minidump_path" | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$path\Crash Dumps" } 2>> $elevatedlog
 		}
 
 		Else {
@@ -143,12 +147,14 @@ Else {
 	}
 	
 	If ( Test-Path "$default_path" ) {
+	
+		Get-ChildItem $default_path | Sort-Object LastWriteTime -Descending >> "$path\Crash Dumps\mini-crash-dumps.txt"
 
 		If ( $(Get-ChildItem -Filter "*.dmp" -Path "$default_path") -ne $null ) {
 
-			Write-Host "Copying Crash Dumps from $minidump_path..."
+			Write-Host "Copying Crash Dumps from $default_path..."
 
-			Get-ChildItem -Filter "*.dmp" -Path "$default_path"  | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$path\Crash Dumps" } 2>> $elevatedlog
+			Get-ChildItem -Filter "*.dmp" -Path "$default_path"  | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$path\Crash Dumps" } 2>> $elevatedlog
 		}
 
 		Else {
@@ -299,7 +305,7 @@ If ( $vernum -ge "6.3" ) {
 		
 		echo $error[0] >> $elevatedlog
 		
-		If ( Test-Path "$scriptdir\autorunsc.exe" ) { Remove-Item "$scriptdir\autorunsc.exe" }
+		If ( Test-Path "$scriptdir\autorunsc.exe" ) { Remove-Item -Force "$scriptdir\autorunsc.exe" }
 	}
 }
 
@@ -322,7 +328,7 @@ Else {
 	
 		echo $error[0] >> $elevatedlog
 		
-		If ( Test-Path "$scriptdir\autorunsc.exe" ) { Remove-Item "$scriptdir\autorunsc.exe" }
+		If ( Test-Path "$scriptdir\autorunsc.exe" ) { Remove-Item -Force "$scriptdir\autorunsc.exe" }
 	}
 }
 
@@ -342,5 +348,5 @@ Else {
 
 If ( Test-Path "$scriptdir\autorunsc.exe" ) {
 
-	Remove-Item "$scriptdir\autorunsc.exe"
+	Remove-Item -Force "$scriptdir\autorunsc.exe"
 }

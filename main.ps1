@@ -13,7 +13,7 @@ If ( [Environment]::Is64BitOperatingSystem -eq $True -and [Environment]::Is64Bit
 
 # Define wait loop function with timeout
 
-function waitloop ( $process, $name, $timeoutseconds, $outputfilepath ){
+function waitloop ( $process, $name, $timeoutseconds, $outputfilepath ) {
 
 	$startDate = Get-Date
 
@@ -40,6 +40,66 @@ function waitloop ( $process, $name, $timeoutseconds, $outputfilepath ){
 
 		Write-Warning "Killed $name due to timeout."
 
+	}
+}
+
+# Define compression function
+
+function compression ( $inputpath, $outputpath ) {
+
+	If ( $PSVersionTable.PSVersion.Major -ge "3" -and $PSVersionTable.CLRVersion.Major -ge "4" ) {
+
+		Try {
+
+			Write-Host "Compressing Folder..."
+
+			Add-Type -Assembly "system.io.compression.filesystem"
+
+			[io.compression.zipfile]::CreateFromDirectory("$inputpath","$outputpath")
+
+			$compression = $?
+			
+			Return $?
+		}
+
+		Catch {
+
+			Write-Warning "Failed to compress the folder with io.compression!"
+
+			If ( Test-Path "$outputpath" ) { Remove-Item "$outputpath" }
+			
+			$compression = "False"
+			
+			Return "False"
+		}
+	}
+
+	If ( $(Test-Path "$scriptdir\compression.vbs") -eq $True -and $compression -ne "True" ) {
+
+		Try {
+		
+			Write-Host "Compressing Folder..."
+			
+			cscript.exe "$scriptdir\compression.vbs" "$inputpath" "$outputpath" > $null 2>> $log
+			
+			Return $?
+		}
+		
+		Catch {
+		
+			Write-Warning "Failed to compress the folder with vbscript!"
+
+			If ( Test-Path "$outputpath" ) { Remove-Item "$outputpath" }
+			
+			Return "False"
+		}
+	}
+	
+	Else {
+	
+		Write-Warning "Could not find compression.vbs"
+	
+		Return "False"
 	}
 }
 
@@ -78,7 +138,7 @@ If ( $vernum -eq 6.2 ) {
 
 # Version String
 
-$scriptver = "Version alpha010 - 9/11/17"
+$scriptver = "Version alpha011 - 9/25/17"
 
 # Startup Banner
 
@@ -116,9 +176,11 @@ $time = $time -Replace "/","-"
 
 $name = "$env:computername ($time)"
 $path = "$home\Desktop\$name"
+$overflow = "$home\Desktop\overflow-$env:computername"
 $log = "$env:TEMP\script-log.log"
 $elevatedlog = "$env:TEMP\script-log-elevated.log"
 $zip = "$path" + ".zip"
+$overflowzip = "$overflow" + ".zip"
 
 # Store the path so elevated.ps1 can retrieve it, elevated.ps1 may run under a different account or during a time change
 
@@ -126,13 +188,17 @@ echo "$path" > "$env:SystemRoot\Temp\path.txt"
 
 # Check for pre-existing files and folders, and remove them if they exist
 
-If ( Test-Path "$path" ) { Remove-Item "$path" -Recurse }
+If ( Test-Path "$path" ) { Remove-Item -Recurse -Force "$path" }
 
-If ( Test-Path "$zip" ) { Remove-Item "$zip" }
+If ( Test-Path "$zip" ) { Remove-Item -Force "$zip" }
 
-If ( Test-Path $log ) { Remove-Item $log }
+If ( Test-Path "$overflow" ) { Remove-Item -Force "$overflow" }
 
-If ( Test-path "$elevatedlog" ) { Remove-Item "$elevatedlog" }
+If ( Test-Path "$overflowzip" ) { Remove-Item -Force "$overflowzip" }
+
+If ( Test-Path $log ) { Remove-Item -Force $log }
+
+If ( Test-path $elevatedlog ) { Remove-Item -Force $elevatedlog }
 
 # Create directories
 
@@ -180,7 +246,7 @@ Else {
 	echo "$scriptdir\elevated.ps1 not found!" >> $log
 	$elevatedscriptfailed = "1"
 	
-	If ( Test-Path "$env:SystemRoot\Temp\path.txt" ) { Remove-Item "$env:SystemRoot\Temp\path.txt" }
+	If ( Test-Path "$env:SystemRoot\Temp\path.txt" ) { Remove-Item -Force "$env:SystemRoot\Temp\path.txt" }
 }
 
 # Start DirectX Diagnostics Report
@@ -206,13 +272,16 @@ Write-Host "Exporting System Event Log..."
 
 wevtutil.exe query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\system-events.txt 2>> $log
 
-Write-Host "Exporting Kernel PnP Log..."
-
-wevtutil.exe query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\pnp-events.txt 2>> $log
-
 Write-Host "Exporting WHEA Event Log..."
 
 wevtutil.exe query-events Microsoft-Windows-Kernel-WHEA/Errors /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\whea-events.txt 2>> $log
+
+If ( $vernum -ge "6.3" ) {
+
+	Write-Host "Exporting Kernel PnP Log..."
+
+	wevtutil.exe query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\pnp-events.txt 2>> $log
+}
 
 # Driver information
 
@@ -304,7 +373,7 @@ If ( Test-Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Unin
 
 	echo "32-bit Software" >> "$path\installed-software.txt"
 
-	Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | Format-Table -AutoSize | Format-Table -AutoSize >> "$path\installed-software.txt"
+	Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | Sort-Object DisplayName | Format-Table -AutoSize | Format-Table -AutoSize >> "$path\installed-software.txt"
 }
 
 echo "User-specific Software" >> "$path\installed-software.txt"
@@ -338,6 +407,8 @@ If ( Test-Path "$env:SystemRoot\System32\drivers\etc\hosts" ) {
 	Get-Content -Path "$env:SystemRoot\System32\drivers\etc\hosts" 2>> $log | Select-String '(127.0.0.1)|(0.0.0.0)' > "$path\hosts.txt"
 }
 
+Else { echo "Hosts file not found." >> $log }
+
 # Wait if dxdiag.exe has not finished, kill process if timeout is reached
 
 If ( $dxdiag -ne $null ) {
@@ -361,9 +432,9 @@ If ( $elevated_script -ne $null ) {
 
 # Move logs into $path if they exist and are not empty
 
-If ( $(Test-Path "$elevatedlog") -eq "True" -and (Get-Item "$elevatedlog").Length -gt 0 ) {
+If ( $(Test-Path $elevatedlog) -eq "True" -and (Get-Item $elevatedlog).Length -gt 0 ) {
 
-	Move-Item "$elevatedlog" -Destination "$path"
+	Move-Item $elevatedlog -Destination "$path"
 }
 
 If ( $(Test-Path "$log") -eq "True" -and (Get-Item "$log").Length -gt 0 ) {
@@ -371,88 +442,94 @@ If ( $(Test-Path "$log") -eq "True" -and (Get-Item "$log").Length -gt 0 ) {
 	Move-Item "$log" -Destination "$path"
 }
 
+# Get hash of files to later check for corruption
+
+$FileName = @{Name="FileName";Expression={Split-Path $_.Path -Leaf}}
+
+If ( $vernum -ge "6.3" ) {
+
+	Get-ChildItem -Path "$path" -Recurse -Exclude "*.wer" | Get-FileHash -Algorithm SHA256 | Select-Object $FileName, Hash, Algorithm | Sort-Object FileName | Format-Table -AutoSize > "$env:LOCALAPPDATA\hashes.txt"
+}
+
+If ( Test-Path "$env:LOCALAPPDATA\hashes.txt" ) {
+
+	Move-Item -Path "$env:LOCALAPPDATA\hashes.txt" -Destination "$path"
+}
+
 # Compress output folder	
 
-If ( $vernum -ge "10.0" ) {
+$compressionresult = compression "$path" "$zip"
 
-	Try {
+# Check that $zip does not exceed 8MB, try to reduce filesize by removing the largest file then compressing, give up after 4 iterations.
 
-		Write-Host "Compressing Folder..."
+$count = 0
 
-		Compress-Archive -Path "$path\*" -DestinationPath "$zip"
+While ( $((Get-Item $zip).Length -ge 8MB) -eq $True -and $count -lt 4 ) {
 
-		$compression = $?
+	If ( !(Test-Path $overflow) ) {
+	
+		New-Item -ItemType Directory "$overflow" -Force 2>> "$path\script-log.log" > $null
 	}
 
-	Catch {
+	Remove-Item -Force $zip
 
-		Write-Warning "Failed to compress the folder with native cmdlet!"
+	Write-Warning "Size of $zip met or exceeded 8MB limit!"
+	echo "Size of $zip met or exceeded 8MB limit!" >> "$path\script-log.log"
+	
+	$trimmedfile = (Get-ChildItem -Recurse -File -Exclude script-log.log, script-log-elevated.log -Path $path | Sort-Object Length -Descending | Select-Object -First 1).FullName
+	
+	echo "Moving the following file to $overflow  to lower the .zip size:" >> "$path\script-log.log"
+	echo $trimmedfile >> "$path\script-log.log"
 
-		If ( Test-Path "$zip" ) { Remove-Item "$zip" }
-		
-		$compression = "False"
-	}	
+	Move-Item -Force -Path $trimmedfile -Destination $overflow
+	
+	Write-Host "Retrying compression..."
+	echo "Retrying compression." >> "$path\script-log.log"
+	
+	$compressionresult = compression "$path" "$zip"
+	
+	$count++
 }
 
-If ( $PSVersionTable.PSVersion.Major -ge "3" -and $PSVersionTable.CLRVersion.Major -ge "4" -and $compression -ne "True" ) {
+If ( $count -ge 4 ) {
 
-	Try {
-
-		Write-Host "Compressing Folder..."
-
-		Add-Type -Assembly "system.io.compression.filesystem"
-
-		[io.compression.zipfile]::CreateFromDirectory("$path","$zip")
-
-		$compression = $?
-	}
-
-	Catch {
-
-		Write-Warning "Failed to compress the folder with io.compression!"
-
-		If ( Test-Path "$zip" ) { Remove-Item "$zip" }
-		
-		$compression = "False"
-	}
+	Write-Warning "Unable to shrink .zip below 8MB"
+	echo "Unable to shrink .zip below 8MB" >> "$path\script-log.log"
 }
 
-If ( $(Test-Path "$scriptdir\compression.vbs") -eq $True -and $compression -ne "True" ) {
+# Compress overflow directory if it exists
 
-	Try {
-	
-		Write-Host "Compressing Folder..."
-		
-		cscript.exe "$scriptdir\compression.vbs" "$path" "$zip" > $null 2>> $log
-		
-		$compression = $?
-	}
-	
-	Catch {
-	
-		Write-Warning "Failed to compress the folder with vbscript!"
+If ( Test-Path $overflow ) {
 
-		If ( Test-Path "$zip" ) { Remove-Item "$zip" }
-		
-		$compression = "False"
-	}
+	$overflowcompression = compression "$overflow" "$overflowzip"
 }
-
-Write-Host "`n"
 
 # Check that the .zip file was created and the compression operation completed successfully before removing the uncompressed directory
 
-If ( "$(Test-Path "$zip")" -eq "True" -and "$compression" -eq "True" ) {
+Write-Host "`n"
 
-	Remove-Item "$path" -Recurse
+If ( $(Test-Path "$zip") -eq "True" -and "$compressionresult" -eq "True" ) {
+
+	Remove-Item -Recurse -Force "$path"
 	Write-Host "Output location: $zip" 
 }
 
 Else {
 
-	Write-Host "Compression failed!"
+	Write-Host "Compression Failed!"
 	Write-Host "`n"
 	Write-Host "Output location: $path"
+}
+
+If ( $(Test-Path $overflowzip) -eq "True" -and $overflowcompression -eq "True" ) {
+
+	Remove-Item -Recurse -Force "$overflow"
+	Write-Host "Second Output Location: $overflowzip"
+}
+
+ElseIf ( $(Test-Path $overflowzip) -eq "True" -and $overflowcompression -ne "True" ) {
+
+	Write-Host "Second Output Location: $overflow"
 }
 
 Write-Host "`n"
