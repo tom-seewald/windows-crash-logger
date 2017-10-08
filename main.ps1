@@ -138,7 +138,7 @@ If ( $vernum -eq 6.2 ) {
 
 # Version String
 
-$scriptver = "Version alpha011 - 9/25/17"
+$scriptver = "Version alpha012 - 10/7/17"
 
 # Startup Banner
 
@@ -344,7 +344,10 @@ If ( $vernum -ge "10.0" ) {
 
 	Get-Partition 2>> $log | Format-List >> "$path\partitions.txt"
 
-	Get-Disk 2>> $log | Select-Object FriendlyName, Model, Manufacturer, Number, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, BusType, FirmwareVersion, PartitionStyle, Path | Format-List > "$path\disks.txt"
+	$disknumbers = (Get-Disk).Number
+
+	ForEach ( $number in $disknumbers ) { Get-Disk -Number $number | Select-Object FriendlyName, Model, Manufacturer, Number, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, BusType, FirmwareVersion, PartitionStyle, Path | Format-List }
+
 }
 
 # System Board information
@@ -378,7 +381,7 @@ If ( Test-Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Unin
 
 echo "User-specific Software" >> "$path\installed-software.txt"
 
-Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where-Object {$_.DisplayName -ne $null} | Format-Table -AutoSize >> "$path\installed-software.txt"
+Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where-Object {$_.DisplayName -ne $null} | Sort-Object DisplayName | Format-Table -AutoSize >> "$path\installed-software.txt"
 
 echo "Installed Windows Components" >> "$path\installed-software.txt"
 
