@@ -138,7 +138,7 @@ If ( $vernum -eq 6.2 ) {
 
 # Version String
 
-$scriptver = "Version alpha012 - 10/7/17"
+$scriptver = "Version Beta01 - 10/8/17"
 
 # Startup Banner
 
@@ -346,7 +346,7 @@ If ( $vernum -ge "10.0" ) {
 
 	$disknumbers = (Get-Disk).Number
 
-	ForEach ( $number in $disknumbers ) { Get-Disk -Number $number | Select-Object FriendlyName, Model, Manufacturer, Number, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, BusType, FirmwareVersion, PartitionStyle, Path | Format-List }
+	ForEach ( $number in $disknumbers ) { Get-Disk -Number $number 2>> $log | Select-Object FriendlyName, Model, Manufacturer, Number, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, BusType, FirmwareVersion, PartitionStyle, Path | Format-List >> "$path\disks.txt"}
 
 }
 
