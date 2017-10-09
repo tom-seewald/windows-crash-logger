@@ -2,6 +2,8 @@
 # Script Written By Spectrum #
 ##############################
 
+Param($path)
+
 # Set output file for logging
 
 $elevatedlog = "$env:TEMP\script-log-elevated.log"
@@ -15,6 +17,19 @@ If ( "$elevatedcheck" -ne "True" ) {
 	Write-Warning "ERROR: Administrator rights are required for this script to work properly!"
 	Write-Warning "Aborting script!"
 	echo "ERROR: Administrator rights are required for this script to work properly!" >> $elevatedlog
+	exit
+}
+
+# Verify path is valid before continuing
+
+Try { Test-Path "$path" > $null }
+
+Catch {
+
+	Write-Warning "Invalid path specified!"
+	Write-Warning "Aborting script!"
+	echo "path is invalid. Script aborted!" >> $elevatedlog
+	echo "path variable is $path" >> $elevatedlog
 	exit
 }
 
@@ -34,32 +49,6 @@ $scriptdir = Split-Path $MyInvocation.MyCommand.Path -Parent
 
 $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size (1000,1000)
 
-# Get output path from main.ps1, verify it is a valid path before continuing
-
-If ( !(Test-Path "$env:SystemRoot\Temp\path.txt") ) { 
-
-	Write-Warning "$env:SystemRoot\Temp\path.txt does not exist! Exiting..."
-	echo "$env:SystemRoot\Temp\path.txt does not exist. Script aborted!" >> $elevatedlog
-	exit
-}
-
-$path = Get-Content "$env:SystemRoot\Temp\path.txt"
-	
-If ( !(Test-Path "$path") ) {
-	
-	Write-Warning "$env:SystemRoot\Temp\path.txt does not contain a valid file path!"
-	Write-Warning "Aborting script!"
-		
-	echo "$env:SystemRoot\Temp\path.txt does not contain a valid filepath! Script aborted!" >> $elevatedlog
-	echo "$path" >> $elevatedlog
-
-	Remove-Item -Force "$env:SystemRoot\Temp\path.txt" > $null 2>> $elevatedlog
-
-	exit
-}
-
-Remove-Item -Force "$env:SystemRoot\Temp\path.txt" > $null 2>> $elevatedlog
-	
 # Get crash dump settings and append crash dump type matrix
 
 Write-Host "Getting Crash Dump Settings..."
@@ -84,11 +73,11 @@ Automatic	7					<does not exist>" >> "$path\Crash Dumps\crash-dump-settings.txt"
 $minidump_path = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl").MinidumpDir
 
 $default_path = "$env:SystemRoot\Minidump"
-	
+
 If ( $default_path -eq $minidump_path ) {
 
 	If ( Test-Path "$minidump_path" ) {
-	
+
 		Get-ChildItem $minidump_path | Sort-Object LastWriteTime -Descending >> "$path\Crash Dumps\mini-crash-dumps.txt"
 
 		If ( $(Get-ChildItem -Filter "*.dmp" -Path "$minidump_path") -ne $null ) {
@@ -99,29 +88,29 @@ If ( $default_path -eq $minidump_path ) {
 		}
 
 		Else {
-		
+
 			Write-Host "No Crash Dumps To Copy From $minidump_path"
 
 			echo "No Crash Dumps To Copy From $minidump_path." >> "$path\Crash Dumps\mini-crash-dumps.txt"
 		}
 	}
-	
+
 	Else {
-	
+
 		Write-Host "No Crash Dumps To Copy From $minidump_path"
-	
+
 		echo "$minidump_path does not exist." >> "$path\Crash Dumps\mini-crash-dumps.txt"
 	}
 }
 
 # If they paths in the registry and the default minidump path differ, check both paths for crash dumps and copy the 5 newest
-	
+
 Else {
 
 	# If the registry path exists and is not empty, copy the 5 newest crash dumps
 
 	If ( Test-Path "$minidump_path" ) {
-	
+
 		Get-ChildItem $minidump_path | Sort-Object LastWriteTime -Descending >> "$path\Crash Dumps\mini-crash-dumps.txt"
 
 		If ( $(Get-ChildItem -Filter "*.dmp" -Path "$minidump_path") -ne $null ) {
@@ -132,22 +121,22 @@ Else {
 		}
 
 		Else {
-		
+
 			Write-Host "No Crash Dumps To Copy From $minidump_path"
 
 			echo "No Crash Dumps To Copy From $minidump_path." >> "$path\Crash Dumps\mini-crash-dumps.txt"
 		}
 	}
-	
+
 	Else {
-	
+
 		Write-Host "No Crash Dumps To Copy From $minidump_path"
-	
+
 		echo "$minidump_path does not exist." >> "$path\Crash Dumps\mini-crash-dumps.txt"
 	}
-	
+
 	If ( Test-Path "$default_path" ) {
-	
+
 		Get-ChildItem $default_path | Sort-Object LastWriteTime -Descending >> "$path\Crash Dumps\mini-crash-dumps.txt"
 
 		If ( $(Get-ChildItem -Filter "*.dmp" -Path "$default_path") -ne $null ) {
@@ -164,11 +153,11 @@ Else {
 			echo "No Crash Dumps To Copy From $default_path." >> "$path\Crash Dumps\mini-crash-dumps.txt"
 		}
 	}
-	
+
 	Else {
-	
+
 		Write-Host "No Crash Dumps To Copy From $default_path"
-	
+
 		echo "$default_path does not exist." >> "$path\Crash Dumps\mini-crash-dumps.txt"
 	}
 }
@@ -205,20 +194,20 @@ Else {
 
 		echo "$dump_path was not found" >> "$path\Crash Dumps\memory-dumps.txt"
 	}
-	
+
 	If ( Test-Path "$env:SystemRoot\Memory.dmp" ) {
-	
+
 		echo "Crash dump found at $env:SystemRoot\Memory.dmp" >> "$path\Crash Dumps\memory-dumps.txt"
 		echo "Creation date: $((Get-Item $env:SystemRoot\MEMORY.DMP).LastWriteTime)" >> "$path\Crash Dumps\memory-dumps.txt"
 		echo "Size on disk: $([math]::truncate((Get-Item "$env:SystemRoot\Memory.dmp").Length / 1MB)) MB" >> "$path\Crash Dumps\memory-dumps.txt"
 	}
-	
+
 	Else {
-	
+
 		echo "$env:SystemRoot\Memory.dmp was not found" >> "$path\Crash Dumps\memory-dumps.txt"
 	}
 }
-	
+
 # List contents of LiveKernelReports directory if it exists and is not empty
 
 If ( $(Test-Path "$env:SystemRoot\LiveKernelReports") -eq $True -and $(Get-ChildItem -Path "$env:SystemRoot\LiveKernelReports" ) -ne $null ) {
@@ -259,11 +248,11 @@ Write-Host "Identifying Running Services..."
 If ( $vernum -ge "10.0" ) {
 
 	$StartType = @{Name="StartType";Expression={(Get-Service $_.Name).StartType}}
-	
+
 	Get-WmiObject Win32_Service 2>> $elevatedlog | Select-Object Name, DisplayName, State, ProcessID, $StartType | Sort-Object State, Name | Format-Table -AutoSize > "$path\services.txt"	
 }
 
-Else { 
+Else {
 
 	Get-WmiObject Win32_Service 2>> $elevatedlog | Select-Object Name, DisplayName, State, ProcessID | Sort-Object State, Name | Format-Table -AutoSize > "$path\services.txt"
 }
@@ -291,7 +280,7 @@ Write-Host "Downloading autorunsc..."
 If ( $vernum -ge "6.3" ) {
 
 	Try {
-	
+
 		$ProgressPreference = 'SilentlyContinue'
 
 		Invoke-WebRequest -Uri "$autorunsurl" -OutFile "$scriptdir\autorunsc.exe" -TimeoutSec 10 2>> $elevatedlog
@@ -300,11 +289,11 @@ If ( $vernum -ge "6.3" ) {
 	Catch {
 
 		Write-Warning "Failed To Download autorunsc. Skipping..."
-	
+
 		echo "Failed to download autrunsc." >> $elevatedlog
-		
+
 		echo $error[0] >> $elevatedlog
-		
+
 		If ( Test-Path "$scriptdir\autorunsc.exe" ) { Remove-Item -Force "$scriptdir\autorunsc.exe" }
 	}
 }
@@ -319,15 +308,15 @@ Else {
 
 		$WebClient.DownloadFile($autorunsurl,"$scriptdir\autorunsc.exe") 2>> $elevatedlog
 	}
-	
+
 	Catch {
-	
+
 		Write-Warning "Failed To Download autorunsc. Skipping..."
-	
+
 		echo "Failed to download autrunsc." >> $elevatedlog
-	
+
 		echo $error[0] >> $elevatedlog
-		
+
 		If ( Test-Path "$scriptdir\autorunsc.exe" ) { Remove-Item -Force "$scriptdir\autorunsc.exe" }
 	}
 }

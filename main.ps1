@@ -27,7 +27,7 @@ function waitloop ( $process, $name, $timeoutseconds, $outputfilepath ) {
 		Start-Sleep -Milliseconds 500
 	}
 
-	If ( !$process.HasExited -and $startDate.AddSeconds($timeoutseconds) -le (Get-Date) ) { 
+	If ( !$process.HasExited -and $startDate.AddSeconds($timeoutseconds) -le (Get-Date) ) {
 
 		Stop-Process -Force -Id $process.Id 2>> $log
 
@@ -58,7 +58,7 @@ function compression ( $inputpath, $outputpath ) {
 			[io.compression.zipfile]::CreateFromDirectory("$inputpath","$outputpath")
 
 			$compression = $?
-			
+
 			Return $?
 		}
 
@@ -67,9 +67,9 @@ function compression ( $inputpath, $outputpath ) {
 			Write-Warning "Failed to compress the folder with io.compression!"
 
 			If ( Test-Path "$outputpath" ) { Remove-Item "$outputpath" }
-			
+
 			$compression = "False"
-			
+
 			Return "False"
 		}
 	}
@@ -77,28 +77,28 @@ function compression ( $inputpath, $outputpath ) {
 	If ( $(Test-Path "$scriptdir\compression.vbs") -eq $True -and $compression -ne "True" ) {
 
 		Try {
-		
+
 			Write-Host "Compressing Folder..."
-			
+
 			cscript.exe "$scriptdir\compression.vbs" "$inputpath" "$outputpath" > $null 2>> $log
-			
+
 			Return $?
 		}
-		
+
 		Catch {
-		
+
 			Write-Warning "Failed to compress the folder with vbscript!"
 
 			If ( Test-Path "$outputpath" ) { Remove-Item "$outputpath" }
-			
+
 			Return "False"
 		}
 	}
-	
+
 	Else {
-	
+
 		Write-Warning "Could not find compression.vbs"
-	
+
 		Return "False"
 	}
 }
@@ -138,7 +138,7 @@ If ( $vernum -eq 6.2 ) {
 
 # Version String
 
-$scriptver = "Version Beta01 - 10/8/17"
+$scriptver = "Beta02 - 10/9/17"
 
 # Startup Banner
 
@@ -152,10 +152,10 @@ Write-Host "
 /_/  \___/_/ /_/  /_/    \____/_/   \__,_/_/ /_/ /_/ /____/          
     __                   ______      ____          __                
    / /   ____  ______   / ____/___  / / /__  _____/ /_____  _____    
-  / /   / __ \/ __ ` /  / /   / __ \/ / / _ \/ ___/ __/ __ \/ ___/    
+  / /   / __ \/ __ ` /  / /   / __ \/ / / _ \/ ___/ __/ __ \/ ___/   
  / /___/ /_/ / /_/ /  / /___/ /_/ / / /  __/ /__/ /_/ /_/ / /        
 /_____/\____/\__, /   \____/\____/_/_/\___/\___/\__/\____/_/         
-            /____/                                                      
+            /____/                                                   
 "
 "`n" * 3
 
@@ -173,7 +173,6 @@ $time = Get-Date
 $time = $time.ToShortDateString() + " " + $time.ToShortTimeString()
 $time = $time -Replace ":"," "
 $time = $time -Replace "/","-"
-
 $name = "$env:computername ($time)"
 $path = "$home\Desktop\$name"
 $overflow = "$home\Desktop\overflow-$env:computername"
@@ -181,10 +180,6 @@ $log = "$env:TEMP\script-log.log"
 $elevatedlog = "$env:TEMP\script-log-elevated.log"
 $zip = "$path" + ".zip"
 $overflowzip = "$overflow" + ".zip"
-
-# Store the path so elevated.ps1 can retrieve it, elevated.ps1 may run under a different account or during a time change
-
-echo "$path" > "$env:SystemRoot\Temp\path.txt"
 
 # Check for pre-existing files and folders, and remove them if they exist
 
@@ -229,7 +224,7 @@ If ( Test-Path "$scriptdir\elevated.ps1" ) {
 
 	Write-Host "Launching Elevated Script..."
 
-	Try { $elevated_script = Start-Process Powershell.exe -ArgumentList """-ExecutionPolicy"" ""Bypass"" ""-NonInteractive"" ""-NoProfile"" ""-File"" ""$scriptdir\elevated.ps1""" -Verb RunAs -PassThru }
+	Try { $elevated_script = Start-Process Powershell.exe -ArgumentList """-ExecutionPolicy"" ""Bypass"" ""-NonInteractive"" ""-NoProfile"" ""-File"" ""$scriptdir\elevated.ps1"" ""$path""" -Verb RunAs -PassThru }
 
 	Catch {
 
@@ -241,11 +236,11 @@ If ( Test-Path "$scriptdir\elevated.ps1" ) {
 }
 
 Else {
-	
+
 	Write-Warning "$scriptdir\elevated.ps1 not found!"
 	echo "$scriptdir\elevated.ps1 not found!" >> $log
 	$elevatedscriptfailed = "1"
-	
+
 	If ( Test-Path "$env:SystemRoot\Temp\path.txt" ) { Remove-Item -Force "$env:SystemRoot\Temp\path.txt" }
 }
 
@@ -313,18 +308,18 @@ $DiskInfoCode=@'
 
 Public Class DiskInfo
 	Private Declare Function QueryDosDevice Lib "kernel32" Alias "QueryDosDeviceA" (ByVal lpDeviceName As String, ByVal lpTargetPath As String, ByVal ucchMax As Long) As Long
-		
+
 	Shared Function GetDeviceName(sDisk As String) As String
-		
+
 		Dim sDevice As String = New String(" ",50)
-			
+
 		If QueryDosDevice(sDisk, sDevice, sDevice.Length) Then
 			Return sDevice
-				
+
 		Else
 			Throw New System.Exception("sDisk value not found - not a disk.")
-				
-		End If	
+
+		End If
 	End Function
 End Class
 
@@ -346,8 +341,7 @@ If ( $vernum -ge "10.0" ) {
 
 	$disknumbers = (Get-Disk).Number
 
-	ForEach ( $number in $disknumbers ) { Get-Disk -Number $number 2>> $log | Select-Object FriendlyName, Model, Manufacturer, Number, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, BusType, FirmwareVersion, PartitionStyle, Path | Format-List >> "$path\disks.txt"}
-
+	ForEach ( $number in $disknumbers ) { Get-Disk -Number $number 2>> $log | Select-Object FriendlyName, Model, SerialNumber, Manufacturer, Number, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, BusType, FirmwareVersion, PartitionStyle, Path | Format-List >> "$path\disks.txt" }
 }
 
 # System Board information
@@ -416,7 +410,7 @@ Else { echo "Hosts file not found." >> $log }
 
 If ( $dxdiag -ne $null ) {
 
-	waitloop $dxdiag dxdiag.exe 30
+	waitloop $dxdiag dxdiag.exe 30 "$path\dxdiag.txt"
 }
 
 # Wait if msinfo32.exe has not finished, kill process if timeout is reached
@@ -459,7 +453,7 @@ If ( Test-Path "$env:LOCALAPPDATA\hashes.txt" ) {
 	Move-Item -Path "$env:LOCALAPPDATA\hashes.txt" -Destination "$path"
 }
 
-# Compress output folder	
+# Compress output folder
 
 $compressionresult = compression "$path" "$zip"
 
@@ -470,7 +464,7 @@ $count = 0
 While ( $((Get-Item $zip).Length -ge 8MB) -eq $True -and $count -lt 4 ) {
 
 	If ( !(Test-Path $overflow) ) {
-	
+
 		New-Item -ItemType Directory "$overflow" -Force 2>> "$path\script-log.log" > $null
 	}
 
@@ -478,19 +472,19 @@ While ( $((Get-Item $zip).Length -ge 8MB) -eq $True -and $count -lt 4 ) {
 
 	Write-Warning "Size of $zip met or exceeded 8MB limit!"
 	echo "Size of $zip met or exceeded 8MB limit!" >> "$path\script-log.log"
-	
+
 	$trimmedfile = (Get-ChildItem -Recurse -File -Exclude script-log.log, script-log-elevated.log -Path $path | Sort-Object Length -Descending | Select-Object -First 1).FullName
-	
+
 	echo "Moving the following file to $overflow  to lower the .zip size:" >> "$path\script-log.log"
 	echo $trimmedfile >> "$path\script-log.log"
 
 	Move-Item -Force -Path $trimmedfile -Destination $overflow
-	
+
 	Write-Host "Retrying compression..."
 	echo "Retrying compression." >> "$path\script-log.log"
-	
+
 	$compressionresult = compression "$path" "$zip"
-	
+
 	$count++
 }
 
