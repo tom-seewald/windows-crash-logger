@@ -22,7 +22,17 @@ If ( "$elevatedcheck" -ne "True" ) {
 
 # Verify path is valid before continuing
 
-Try { Test-Path "$path" > $null }
+Try {
+
+	If ( !(Test-Path "$path") ) {
+
+		Write-Warning "Invalid path specified!"
+		Write-Warning "Aborting script!"
+		echo "path is invalid. Script aborted!" >> $elevatedlog
+		echo "path variable is $path" >> $elevatedlog
+		exit
+	}
+}
 
 Catch {
 

@@ -138,7 +138,7 @@ If ( $vernum -eq 6.2 ) {
 
 # Version String
 
-$scriptver = "Beta02 - 10/9/17"
+$scriptver = "Beta02 - 10/10/17"
 
 # Startup Banner
 
@@ -157,6 +157,7 @@ Write-Host "
 /_____/\____/\__, /   \____/\____/_/_/\___/\___/\__/\____/_/         
             /____/                                                   
 "
+
 "`n" * 3
 
 Write-Host $scriptver
