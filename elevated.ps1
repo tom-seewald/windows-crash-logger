@@ -233,7 +233,7 @@ If ( $vernum -ge "6.3" ) {
 
 	Write-Host "Running System Power Report..."
 
-	powercfg.exe /sleepstudy /output "$path\power-report.html" > $null 2>> $elevatedlog
+	&"$env:SystemRoot\System32\powercfg.exe" /sleepstudy /output "$path\power-report.html" > $null 2>> $elevatedlog
 }
 
 # Disk and partition information, 8.1 requires admin rights unlike 10

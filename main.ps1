@@ -80,7 +80,7 @@ function compression ( $inputpath, $outputpath ) {
 
 			Write-Host "Compressing Folder..."
 
-			cscript.exe "$scriptdir\compression.vbs" "$inputpath" "$outputpath" > $null 2>> $log
+			&"$env:SystemRoot\System32\cscript.exe" "$scriptdir\compression.vbs" "$inputpath" "$outputpath" > $null 2>> $log
 
 			Return $?
 		}
@@ -138,7 +138,7 @@ If ( $vernum -eq 6.2 ) {
 
 # Version String
 
-$scriptver = "Beta02 - 10/10/17"
+$scriptver = "Beta03 - 10/11/17"
 
 # Startup Banner
 
@@ -210,7 +210,7 @@ New-Item -ItemType Directory "$path\Error Reports" -Force -ErrorAction Stop > $n
 
 Write-Host "Generating System Information Report, this may take a while..."
 
-Try { $msinfo32 = Start-Process msinfo32.exe -ArgumentList """/nfo"" ""$path\msinfo32.nfo""" -PassThru }
+Try { $msinfo32 = Start-Process -FilePath "$env:SystemRoot\System32\msinfo32.exe" -ArgumentList """/nfo"" ""$path\msinfo32.nfo""" -PassThru }
 
 Catch {
 
@@ -225,7 +225,7 @@ If ( Test-Path "$scriptdir\elevated.ps1" ) {
 
 	Write-Host "Launching Elevated Script..."
 
-	Try { $elevated_script = Start-Process Powershell.exe -ArgumentList """-ExecutionPolicy"" ""Bypass"" ""-NonInteractive"" ""-NoProfile"" ""-File"" ""$scriptdir\elevated.ps1"" ""$path""" -Verb RunAs -PassThru }
+	Try { $elevated_script = Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList """-ExecutionPolicy"" ""Bypass"" ""-NonInteractive"" ""-NoProfile"" ""-File"" ""$scriptdir\elevated.ps1"" ""$path""" -Verb RunAs -PassThru }
 
 	Catch {
 
@@ -249,7 +249,7 @@ Else {
 
 Write-Host "Running DirectX Diagnostics..."
 
-Try { $dxdiag = Start-Process dxdiag.exe -ArgumentList "/dontskip","/whql:off","/t","$path\dxdiag.txt" -NoNewWindow -PassThru }
+Try { $dxdiag = Start-Process -FilePath "$env:SystemRoot\System32\dxdiag.exe" -ArgumentList "/dontskip","/whql:off","/t","$path\dxdiag.txt" -NoNewWindow -PassThru }
 
 Catch {
 
@@ -262,28 +262,28 @@ Catch {
 
 Write-Host "Exporting Application Event Log..."
 
-wevtutil.exe query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\application-events.txt 2>> $log
+&"$env:SystemRoot\System32\wevtutil.exe" query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\application-events.txt 2>> $log
 
 Write-Host "Exporting System Event Log..."
 
-wevtutil.exe query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\system-events.txt 2>> $log
+&"$env:SystemRoot\System32\wevtutil.exe" query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\system-events.txt 2>> $log
 
 Write-Host "Exporting WHEA Event Log..."
 
-wevtutil.exe query-events Microsoft-Windows-Kernel-WHEA/Errors /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\whea-events.txt 2>> $log
+&"$env:SystemRoot\System32\wevtutil.exe" query-events Microsoft-Windows-Kernel-WHEA/Errors /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\whea-events.txt 2>> $log
 
 If ( $vernum -ge "6.3" ) {
 
 	Write-Host "Exporting Kernel PnP Log..."
 
-	wevtutil.exe query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\pnp-events.txt 2>> $log
+	&"$env:SystemRoot\System32\wevtutil.exe" query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\pnp-events.txt 2>> $log
 }
 
 # Driver information
 
 Write-Host "Gathering Driver Information..."
 
-driverquery.exe /v /fo table 2>> $log | Select-Object -Skip 1 > "$path\driver-list.txt"
+&"$env:SystemRoot\System32\driverquery.exe" /v /fo table 2>> $log | Select-Object -Skip 1 > "$path\driver-list.txt"
 
 Get-WmiObject Win32_PnPSignedDriver 2>> $log | Select-Object DeviceName, FriendlyName, InfName, DriverVersion, IsSigned, DriverDate | Where-Object {$_.DeviceName -ne $null -or $_.FriendlyName -ne $null -or $_.InfName -ne $null } | Sort-Object DeviceName | Format-Table -AutoSize > "$path\driver-versions.txt"
 
@@ -291,7 +291,7 @@ Get-WmiObject Win32_PnPSignedDriver 2>> $log | Select-Object DeviceName, Friendl
 
 Write-Host "Checking Power Settings..."
 
-powercfg.exe /list > "$path\power-plan.txt" 2>> $log
+&"$env:SystemRoot\System32\powercfg.exe" /list > "$path\power-plan.txt" 2>> $log
 
 # RAM info
 
@@ -359,7 +359,7 @@ Get-WmiObject Win32_VideoController 2>> $log | Select-Object Name, DeviceID, PNP
 
 Write-Host "Finding Windows License Information..."
 
-cscript.exe $env:SystemRoot\System32\slmgr.vbs /dlv 2>> $log | Select-Object -Skip 4 > "$path\windows-license-info.txt"
+&"$env:SystemRoot\System32\cscript.exe" $env:SystemRoot\System32\slmgr.vbs /dlv 2>> $log | Select-Object -Skip 4 > "$path\windows-license-info.txt"
 
 # Installed software, first check native and then 32-bit (if it exists).
 
@@ -392,9 +392,9 @@ Get-WmiObject Win32_QuickFixEngineering 2>> $log | Select-Object HotFixID,Descri
 
 Write-Host "Finding Network Information..."
 
-ipconfig.exe /allcompartments /all 2>> $log | Select-Object -Skip 1 > "$path\network-info.txt"
+&"$env:SystemRoot\System32\ipconfig.exe" /allcompartments /all 2>> $log | Select-Object -Skip 1 > "$path\network-info.txt"
 
-route.exe print >> "$path\network-info.txt" 2>> $log
+&"$env:SystemRoot\System32\route.exe" print >> "$path\network-info.txt" 2>> $log
 
 # Copy relevant entries from the hosts file
 
