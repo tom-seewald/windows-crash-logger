@@ -245,6 +245,12 @@ If ( $vernum -eq "6.3" ) {
 	Get-Disk 2>> $elevatedlog | Select-Object FriendlyName, Model, Manufacturer, Number, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, BusType, FirmwareVersion, PartitionStyle, Path | Format-List >> "$path\disks.txt"																	 "$path\disks.txt"
 }
 
+# List PnP devices and associated information
+
+Write-Host "Listing PnP Devices..."
+
+Get-WmiObject Win32_PNPEntity 2>> $elevatedlog | Select-Object Name, Status, ConfigManagerErrorCode, Description, Manufacturer, DeviceID | Sort-Object Name | Format-Table -AutoSize >> "$path\pnp-devices.txt"
+
 # List all processes
 
 Write-Host "Enumerating Running Processes..."
