@@ -11,6 +11,18 @@ If ( [Environment]::Is64BitOperatingSystem -eq $True -and [Environment]::Is64Bit
 	exit
 }
 
+# Abort if Controlled Folder Access is enabled
+
+If ( (Get-MpPreference).EnableControlledFolderAccess -eq 1 ) {
+
+	Write-Warning "Controlled Folder Access is enabled in Windows Defender, this prevents the script from placing log files on your Desktop."
+	Write-Host "`n"
+	Write-Warning "If you would like allow this script to run, please temporarily disable Controlled Folder Access in Windows Defender Security Center and then re-launch this script."
+	Write-Host "`n"
+	Read-Host -Prompt "Press Enter to close this window"
+	exit
+}
+
 # Define wait loop function with timeout
 
 function waitloop ( $process, $name, $timeoutseconds, $outputfilepath ) {
@@ -138,7 +150,7 @@ If ( $vernum -eq 6.2 ) {
 
 # Version String
 
-$scriptver = "Beta03 - 10/11/17"
+$scriptver = "Beta04 - 10/19/17"
 
 # Startup Banner
 
@@ -283,7 +295,7 @@ If ( $vernum -ge "6.3" ) {
 
 Write-Host "Gathering Driver Information..."
 
-&"$env:SystemRoot\System32\driverquery.exe" /v /fo table 2>> $log | Select-Object -Skip 1 > "$path\driver-list.txt"
+&"$env:SystemRoot\System32\driverquery.exe" /v /fo table 2>> $log | Select-Object -Skip 1 > "$path\driver-table.txt"
 
 Get-WmiObject Win32_PnPSignedDriver 2>> $log | Select-Object DeviceName, FriendlyName, InfName, DriverVersion, IsSigned, DriverDate | Where-Object {$_.DeviceName -ne $null -or $_.FriendlyName -ne $null -or $_.InfName -ne $null } | Sort-Object DeviceName | Format-Table -AutoSize > "$path\driver-versions.txt"
 
@@ -380,7 +392,7 @@ Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" 2
 
 echo "Installed Windows Components" >> "$path\installed-software.txt"
 
-Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\*" 2>> $log | Select-Object "(Default)", ComponentID, Version, Enabled | Where-Object {$_."(Default)" -ne $null -or $_.ComponentID -ne $null} | Sort-Object @{Expression = "Enabled"; Descending = $True}, "(default)" | Format-Table -AutoSize >> "$path\installed-software.txt"
+Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\*" 2>> $log | Select-Object "(Default)", ComponentID, Version, Enabled | Where-Object {$_."(Default)" -ne $null -or $_.ComponentID -ne $null} | Sort-Object "(default)" | Format-Table -AutoSize >> "$path\installed-software.txt"
 
 # Installed Windows Updates
 
