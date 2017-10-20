@@ -2,27 +2,6 @@
 # Script Written By Spectrum #
 ##############################
 
-# If the OS is 64-bit and this script was launched with 32-bit PowerShell, relaunch with 64-bit PowerShell and exit the current instance
-
-If ( [Environment]::Is64BitOperatingSystem -eq $True -and [Environment]::Is64BitProcess -eq $False ) {
-
-	&"$env:SystemRoot\sysnative\windowspowershell\v1.0\powershell.exe" -NoProfile $myInvocation.InvocationName
-
-	exit
-}
-
-# Abort if Controlled Folder Access is enabled
-
-If ( (Get-MpPreference).EnableControlledFolderAccess -eq 1 ) {
-
-	Write-Warning "Controlled Folder Access is enabled in Windows Defender, this prevents the script from placing log files on your Desktop."
-	Write-Host "`n"
-	Write-Warning "If you would like allow this script to run, please temporarily disable Controlled Folder Access in Windows Defender Security Center and then re-launch this script."
-	Write-Host "`n"
-	Read-Host -Prompt "Press Enter to close this window"
-	exit
-}
-
 # Define wait loop function with timeout
 
 function waitloop ( $process, $name, $timeoutseconds, $outputfilepath ) {
@@ -115,15 +94,7 @@ function compression ( $inputpath, $outputpath ) {
 	}
 }
 
-# This is set because $PSScriptRoot is not available on stock Windows 7 SP1
-
-$scriptdir = Split-Path $MyInvocation.MyCommand.Path -Parent
-
-# Set window size to 1000 by 1000 to avoid truncation when sending output to files
-
-$Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size (1000,1000)
-
-# Detect Windows version, convert the value from a string to a decimal
+# Detect Windows version, warn or abort if it is unsupported
 
 $majorver=[System.Environment]::OSVersion.Version.Major
 $minorver=[System.Environment]::OSVersion.Version.Minor
@@ -148,6 +119,37 @@ If ( $vernum -eq 6.2 ) {
 	Write-Warning "This Script Has Not Been Tested On Windows 8, Please Upgrade!"
 }
 
+# If the OS is 64-bit and this script was launched with 32-bit PowerShell, relaunch with 64-bit PowerShell and exit the current instance
+
+If ( [Environment]::Is64BitOperatingSystem -eq $True -and [Environment]::Is64BitProcess -eq $False ) {
+
+	&"$env:SystemRoot\sysnative\windowspowershell\v1.0\powershell.exe" -NoProfile $myInvocation.InvocationName
+
+	exit
+}
+
+# Abort if Controlled Folder Access is enabled
+
+If ( $vernum -ge 10 ) {
+
+	If ( (Get-MpPreference).EnableControlledFolderAccess -eq 1 ) {
+
+		Write-Warning "Controlled Folder Access is enabled in Windows Defender, this prevents the script from placing log files on your Desktop."
+		Write-Host "`n"
+		Write-Warning "If you would like allow this script to run, please temporarily disable Controlled Folder Access in Windows Defender Security Center and then re-launch this script."
+		Write-Host "`n"
+		Read-Host -Prompt "Press Enter to close this window"
+		exit
+	}
+}
+
+# This is set because $PSScriptRoot is not available on stock Windows 7 SP1
+
+$scriptdir = Split-Path $MyInvocation.MyCommand.Path -Parent
+
+# Set window size to 1000 by 1000 to avoid truncation when sending output to files
+
+$Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size (1000,1000)
 # Version String
 
 $scriptver = "Beta04 - 10/19/17"
