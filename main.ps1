@@ -119,15 +119,6 @@ If ( $vernum -eq 6.2 ) {
 	Write-Warning "This Script Has Not Been Tested On Windows 8, Please Upgrade!"
 }
 
-# If the OS is 64-bit and this script was launched with 32-bit PowerShell, relaunch with 64-bit PowerShell and exit the current instance
-
-If ( [Environment]::Is64BitOperatingSystem -eq $True -and [Environment]::Is64BitProcess -eq $False ) {
-
-	&"$env:SystemRoot\sysnative\windowspowershell\v1.0\powershell.exe" -NoProfile $myInvocation.InvocationName
-
-	exit
-}
-
 # Abort if Controlled Folder Access is enabled
 
 If ( $vernum -ge 10 ) {
@@ -143,6 +134,15 @@ If ( $vernum -ge 10 ) {
 	}
 }
 
+# If the OS is 64-bit and this script was launched with 32-bit PowerShell, relaunch with 64-bit PowerShell and exit the current instance
+
+If ( [Environment]::Is64BitOperatingSystem -eq $True -and [Environment]::Is64BitProcess -eq $False ) {
+
+	&"$env:SystemRoot\sysnative\windowspowershell\v1.0\powershell.exe" -NoProfile $myInvocation.InvocationName
+
+	exit
+}
+
 # This is set because $PSScriptRoot is not available on stock Windows 7 SP1
 
 $scriptdir = Split-Path $MyInvocation.MyCommand.Path -Parent
@@ -150,9 +150,10 @@ $scriptdir = Split-Path $MyInvocation.MyCommand.Path -Parent
 # Set window size to 1000 by 1000 to avoid truncation when sending output to files
 
 $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size (1000,1000)
+
 # Version String
 
-$scriptver = "Beta04 - 10/19/17"
+$scriptver = "Beta05 - 10/21/17"
 
 # Startup Banner
 
@@ -255,8 +256,6 @@ Else {
 	Write-Warning "$scriptdir\elevated.ps1 not found!"
 	echo "$scriptdir\elevated.ps1 not found!" >> $log
 	$elevatedscriptfailed = "1"
-
-	If ( Test-Path "$env:SystemRoot\Temp\path.txt" ) { Remove-Item -Force "$env:SystemRoot\Temp\path.txt" }
 }
 
 # Start DirectX Diagnostics Report
