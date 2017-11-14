@@ -8,6 +8,8 @@ Param($path)
 
 $elevatedlog = "$env:TEMP\script-log-elevated.log"
 
+If ( Test-Path "$elevatedlog" ) { Remove-Item -Force "$elevatedlog" }
+
 # Check that this script is being run with elevated credentials, e.g. Administrator, SYSTEM, or TrustedInstaller
 
 $elevatedcheck = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
@@ -49,7 +51,7 @@ $majorver=[System.Environment]::OSVersion.Version.Major
 $minorver=[System.Environment]::OSVersion.Version.Minor
 $ver = "$majorver" + "." + "$minorver"
 
-$vernum=$ver -as [decimal]
+$vernum = $ver -as [decimal]
 
 # This is set because $PSScriptRoot is not available on stock Windows 7 SP1
 
@@ -242,7 +244,7 @@ If ( $vernum -eq "6.3" ) {
 
 	Get-Partition 2>> $elevatedlog | Format-List >> "$path\partitions.txt"
 
-	Get-Disk 2>> $elevatedlog | Select-Object FriendlyName, Model, Manufacturer, Number, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, BusType, FirmwareVersion, PartitionStyle, Path | Format-List >> "$path\disks.txt"																	 "$path\disks.txt"
+	Get-Disk 2>> $elevatedlog | Select-Object FriendlyName, Model, Manufacturer, Number, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, BusType, FirmwareVersion, PartitionStyle, Path | Format-List >> "$path\disks.txt"
 }
 
 # List PnP devices and associated information
@@ -354,4 +356,11 @@ Else {
 If ( Test-Path "$scriptdir\autorunsc.exe" ) {
 
 	Remove-Item -Force "$scriptdir\autorunsc.exe"
+}
+
+# Move log into $path if it is non-empty
+
+If ( $(Test-Path "$elevatedlog") -eq "True" -and (Get-Item "$elevatedlog").Length -gt 0 ) {
+
+	Move-Item "$elevatedlog" -Destination "$path"
 }

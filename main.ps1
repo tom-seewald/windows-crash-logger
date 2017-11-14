@@ -30,7 +30,6 @@ function waitloop ( $process, $name, $timeoutseconds, $outputfilepath ) {
 		echo "Killed $name due to timeout." >> $log
 
 		Write-Warning "Killed $name due to timeout."
-
 	}
 }
 
@@ -153,7 +152,7 @@ $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size (1000,100
 
 # Version String
 
-$scriptver = "Beta05 - 10/21/17"
+$scriptver = "Beta06 - 11/13/17"
 
 # Startup Banner
 
@@ -193,7 +192,6 @@ $name = "$env:computername ($time)"
 $path = "$home\Desktop\$name"
 $overflow = "$home\Desktop\overflow-$env:computername"
 $log = "$env:TEMP\script-log.log"
-$elevatedlog = "$env:TEMP\script-log-elevated.log"
 $zip = "$path" + ".zip"
 $overflowzip = "$overflow" + ".zip"
 
@@ -207,9 +205,7 @@ If ( Test-Path "$overflow" ) { Remove-Item -Force "$overflow" }
 
 If ( Test-Path "$overflowzip" ) { Remove-Item -Force "$overflowzip" }
 
-If ( Test-Path $log ) { Remove-Item -Force $log }
-
-If ( Test-path $elevatedlog ) { Remove-Item -Force $elevatedlog }
+If ( Test-Path "$log" ) { Remove-Item -Force "$log" }
 
 # Create directories
 
@@ -441,12 +437,7 @@ If ( $elevated_script -ne $null ) {
 	waitloop $elevated_script "Elevated Script" 120
 }
 
-# Move logs into $path if they exist and are not empty
-
-If ( $(Test-Path $elevatedlog) -eq "True" -and (Get-Item $elevatedlog).Length -gt 0 ) {
-
-	Move-Item $elevatedlog -Destination "$path"
-}
+# Move log into $path if it is non-empty
 
 If ( $(Test-Path "$log") -eq "True" -and (Get-Item "$log").Length -gt 0 ) {
 
