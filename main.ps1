@@ -152,7 +152,7 @@ $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size (1000,100
 
 # Version String
 
-$scriptver = "Beta06 - 11/13/17"
+$scriptver = "Beta06 - 12/2/17"
 
 # Startup Banner
 

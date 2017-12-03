@@ -2,7 +2,7 @@
 # Script Written By Spectrum #
 ##############################
 
-Param($path)
+Param([string]$path)
 
 # Set output file for logging
 
