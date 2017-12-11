@@ -2,125 +2,122 @@
 # Script Written By Spectrum #
 ##############################
 
-# Define wait loop function with timeout
+# Loops until a process exits for a specified number of seconds, kills the process if the timeout is reached
+Function WaitFor-Process ( $Process, $Name, $TimeoutSeconds, $OutputFilePath ) {
 
-function waitloop ( $process, $name, $timeoutseconds, $outputfilepath ) {
+	$StartTime = Get-Date
 
-	$startDate = Get-Date
-
-	If ( !$process.HasExited ) {
+	If ( !$Process.HasExited ) {
 
 		Write-Host "Waiting For $name To Finish..."
 	}
 
-	While ( !$process.HasExited -and $startDate.AddSeconds($timeoutseconds) -gt (Get-Date) ) {
+	While ( !$Process.HasExited -and $StartTime.AddSeconds($TimeoutSeconds) -gt (Get-Date) ) {
 
 		Start-Sleep -Milliseconds 500
 	}
 
-	If ( !$process.HasExited -and $startDate.AddSeconds($timeoutseconds) -le (Get-Date) ) {
+	If ( !$Process.HasExited -and $StartTime.AddSeconds($TimeoutSeconds) -le (Get-Date) ) {
 
-		Stop-Process -Force -Id $process.Id 2>> $log
+		Stop-Process -Force -Id $Process.Id 2>> $Log
 
-		If ( "$outputfilepath" -ne $null ) {
+		If ( "$OutputFilePath" -ne $null ) {
 
-			Remove-Item "$outputfilepath" 2>> $log
+			Remove-Item "$OutputFilePath" 2>> $Log
 		}
 
-		echo "Killed $name due to timeout." >> $log
-
+		Write-Output "Killed $name due to timeout." >> $Log
 		Write-Warning "Killed $name due to timeout."
 	}
 }
 
-# Define compression function
-
-function compression ( $inputpath, $outputpath ) {
+# Compresses specified folder, attempts to use built-in compression (PowerShell 3+) and falls back to using compression.vbs
+Function Compress-Folder ( $InputPath, $OutputPath ) {
 
 	If ( $PSVersionTable.PSVersion.Major -ge "3" -and $PSVersionTable.CLRVersion.Major -ge "4" ) {
 
 		Try {
 
 			Write-Host "Compressing Folder..."
-
 			Add-Type -Assembly "system.io.compression.filesystem"
-
-			[io.compression.zipfile]::CreateFromDirectory("$inputpath","$outputpath")
-
-			$compression = $?
-
+			[io.compression.zipfile]::CreateFromDirectory("$inputpath","$OutputPath")
+			$Compression = $?
 			Return $?
 		}
 
 		Catch {
 
 			Write-Warning "Failed to compress the folder with io.compression!"
+			Write-Output "Failed to compress the folder with io.compression!" >> $Log
+			Write-Output $error[0] >> $Log
 
-			If ( Test-Path "$outputpath" ) { Remove-Item "$outputpath" }
-
-			$compression = "False"
-
+			If ( Test-Path -Path $OutputPath ) {
+			
+				Remove-Item $OutputPath
+			}
+			
+			$Compression = "False"
 			Return "False"
 		}
 	}
 
-	If ( $(Test-Path "$scriptdir\compression.vbs") -eq $True -and $compression -ne "True" ) {
+	If ( $(Test-Path -Path "$ScriptDir\compression.vbs") -eq $True -and $Compression -ne "True" ) {
 
 		Try {
 
 			Write-Host "Compressing Folder..."
-
-			&"$env:SystemRoot\System32\cscript.exe" "$scriptdir\compression.vbs" "$inputpath" "$outputpath" > $null 2>> $log
-
+			&"$env:SystemRoot\System32\cscript.exe" "$ScriptDir\compression.vbs" "$inputpath" "$OutputPath" > $null 2>> $Log
 			Return $?
 		}
 
 		Catch {
 
 			Write-Warning "Failed to compress the folder with vbscript!"
+			Write-Output "Failed to compress the folder with vbscript!" >> $Log
+			Write-Output $error[0] >> $Log
 
-			If ( Test-Path "$outputpath" ) { Remove-Item "$outputpath" }
-
+			If ( Test-Path -Path $OutputPath ) {
+			
+				Remove-Item $OutputPath
+			}
+			
 			Return "False"
 		}
 	}
 
 	Else {
 
+		Write-Output "Could not find $ScriptDir\compression.vbs" >> $Log
 		Write-Warning "Could not find compression.vbs"
-
 		Return "False"
 	}
 }
 
-# Detect Windows version, warn or abort if it is unsupported
+# Detect Windows version, convert the value from a string to a decimal
+$MajorVer=[System.Environment]::OSVersion.Version.Major
+$MinorVer=[System.Environment]::OSVersion.Version.Minor
+$VerNum = "$MajorVer" + "." + "$MinorVer" -as [decimal]
 
-$majorver=[System.Environment]::OSVersion.Version.Major
-$minorver=[System.Environment]::OSVersion.Version.Minor
-$ver = "$majorver" + "." + "$minorver"
+# Check that the OS is supported
+If ( $VerNum -lt 6.1 ) {
 
-$vernum=$ver -as [decimal]
-
-If ( $vernum -lt 6.1 ) {
-
-	echo "UNSUPPORTED VERSION OF WINDOWS DETECTED - KERNEL VERSION LESS THAN 6.1" >> $log
+	Write-Output "UNSUPPORTED VERSION OF WINDOWS DETECTED - KERNEL VERSION LESS THAN 6.1" >> $Log
 	Write-Host "`n"
 	Write-Warning "Windows Version Is Unsupported!"
 	Write-Warning "This Script Has Not Been Tested On Anything Before Windows 7!"
-	exit
+	Exit
 }
 
-If ( $vernum -eq 6.2 ) {
+If ( $VerNum -eq 6.2 ) {
 
-	echo "UNSUPPORTED VERSION OF WINDOWS DETECTED - WINDOWS 8" >> $log
+	Write-Output "UNSUPPORTED VERSION OF WINDOWS DETECTED - WINDOWS 8" >> $Log
 	Write-Host "`n"
 	Write-Warning "Windows Version Is Unsupported!"
 	Write-Warning "This Script Has Not Been Tested On Windows 8, Please Upgrade!"
 }
 
-# Abort if Controlled Folder Access is enabled
-
-If ( $vernum -ge 10 ) {
+# Abort if Controlled Folder Access is enabled, as it prevents log files from being placed on the desktop
+If ( $VerNum -ge 10 ) {
 
 	If ( (Get-MpPreference).EnableControlledFolderAccess -eq 1 ) {
 
@@ -129,34 +126,29 @@ If ( $vernum -ge 10 ) {
 		Write-Warning "If you would like allow this script to run, please temporarily disable Controlled Folder Access in Windows Defender Security Center and then re-launch this script."
 		Write-Host "`n"
 		Read-Host -Prompt "Press Enter to close this window"
-		exit
+		Exit
 	}
 }
 
-# If the OS is 64-bit and this script was launched with 32-bit PowerShell, relaunch with 64-bit PowerShell and exit the current instance
-
+# If the OS is 64-bit and this script was launched with 32-bit PowerShell, relaunch with 64-bit PowerShell and Exit the current instance
 If ( [Environment]::Is64BitOperatingSystem -eq $True -and [Environment]::Is64BitProcess -eq $False ) {
 
 	&"$env:SystemRoot\sysnative\windowspowershell\v1.0\powershell.exe" -NoProfile $myInvocation.InvocationName
-
-	exit
+	Write-Output "The OS is 64-bit but powershell.exe is 32-bit, relaunching script with 64-bit PowerShell." >> $Log
+	Exit
 }
 
 # This is set because $PSScriptRoot is not available on stock Windows 7 SP1
-
-$scriptdir = Split-Path $MyInvocation.MyCommand.Path -Parent
+$ScriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
 
 # Set window size to 1000 by 1000 to avoid truncation when sending output to files
-
 $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size (1000,1000)
 
 # Version String
-
-$scriptver = "Beta06 - 12/2/17"
+$ScriptVer = "Beta07 - 12/10/17"
 
 # Startup Banner
-
-clear
+Clear-Host
 
 Write-Host "
   ______              ______                          _              
@@ -173,147 +165,130 @@ Write-Host "
 "
 
 "`n" * 3
-
-Write-Host $scriptver
-
+Write-Host $ScriptVer
 "`n" * 3
 
 Read-Host -Prompt "Press Enter To Continue"
-
-clear
+Clear-Host
 
 # Set variables for output folders
-
-$time = Get-Date
-$time = $time.ToShortDateString() + " " + $time.ToShortTimeString()
-$time = $time -Replace ":"," "
-$time = $time -Replace "/","-"
-$name = "$env:computername ($time)"
-$path = "$home\Desktop\$name"
-$overflow = "$home\Desktop\overflow-$env:computername"
-$log = "$env:TEMP\script-log.log"
-$zip = "$path" + ".zip"
-$overflowzip = "$overflow" + ".zip"
+$Time = Get-Date -Format "M-d-yyyy HH mm tt"
+$Name = "$env:computername ($Time)"
+$Path = "$home\Desktop\$Name"
+$Overflow = "$home\Desktop\Overflow-$env:computername"
+$Log = "$env:TEMP\script-log.log"
+$Zip = "$Path" + ".zip"
+$Overflowzip = "$Overflow" + ".zip"
 
 # Check for pre-existing files and folders, and remove them if they exist
-
-If ( Test-Path "$path" ) { Remove-Item -Recurse -Force "$path" }
-
-If ( Test-Path "$zip" ) { Remove-Item -Force "$zip" }
-
-If ( Test-Path "$overflow" ) { Remove-Item -Force "$overflow" }
-
-If ( Test-Path "$overflowzip" ) { Remove-Item -Force "$overflowzip" }
-
-If ( Test-Path "$log" ) { Remove-Item -Force "$log" }
+If ( Test-Path -Path $Path ) { Remove-Item -Recurse -Force $Path }
+If ( Test-Path -Path $Zip ) { Remove-Item -Force $Zip }
+If ( Test-Path -Path $Overflow ) { Remove-Item -Force $Overflow }
+If ( Test-Path -Path $Overflowzip ) { Remove-Item -Force $Overflowzip }
+If ( Test-Path -Path $Log ) { Remove-Item -Force $Log }
 
 # Create directories
-
-New-Item -ItemType Directory "$path" -Force -ErrorAction Stop > $null 2>> $log
-
-New-Item -ItemType Directory "$path\Events" -Force -ErrorAction Stop > $null 2>> $log
-
-New-Item -ItemType Directory "$path\Crash Dumps" -Force -ErrorAction Stop > $null 2>> $log
-
-New-Item -ItemType Directory "$path\Error Reports" -Force -ErrorAction Stop > $null 2>> $log
+New-Item -ItemType Directory $Path -Force -ErrorAction Stop > $null 2>> $Log
+New-Item -ItemType Directory "$Path\Events" -Force -ErrorAction Stop > $null 2>> $Log
+New-Item -ItemType Directory "$Path\Crash Dumps" -Force -ErrorAction Stop > $null 2>> $Log
+New-Item -ItemType Directory "$Path\Error Reports" -Force -ErrorAction Stop > $null 2>> $Log
 
 # Generate System Information Report
-
 Write-Host "Generating System Information Report, this may take a while..."
 
-Try { $msinfo32 = Start-Process -FilePath "$env:SystemRoot\System32\msinfo32.exe" -ArgumentList """/nfo"" ""$path\msinfo32.nfo""" -PassThru }
+Try {
+
+	$MsInfo32 = Start-Process -FilePath "$env:SystemRoot\System32\msinfo32.exe" -ArgumentList """/nfo"" ""$Path\msinfo32.nfo""" -PassThru
+}
 
 Catch {
 
 	Write-Warning "Failed To Launch msinfo32.exe!"
-	echo "Failed to launch msinfo32.exe!" >> $log
-	echo $error[0] >> $log
+	Write-Output "Failed to launch msinfo32.exe!" >> $Log
+	Write-Output $error[0] >> $Log
 }
 
 # Start elevated.ps1
-
-If ( Test-Path "$scriptdir\elevated.ps1" ) {
+If ( Test-Path -Path "$ScriptDir\elevated.ps1" ) {
 
 	Write-Host "Launching Elevated Script..."
 
-	Try { $elevated_script = Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList """-ExecutionPolicy"" ""Bypass"" ""-NonInteractive"" ""-NoProfile"" ""-File"" ""$scriptdir\elevated.ps1"" ""$path""" -Verb RunAs -PassThru }
+	Try {
+	
+		$ElevatedScript = Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
+										-ArgumentList """-ExecutionPolicy"" ""Bypass"" ""-NonInteractive"" ""-NoProfile"" ""-File"" ""$ScriptDir\elevated.ps1"" ""$Path""" `
+										-Verb RunAs -PassThru
+	}
 
 	Catch {
 
 		Write-Warning "Failed To Launch Elevated Script!" 
-		echo "Failed To Launch Elevated Script!" >> $log
-		$elevatedscriptfailed = "1"
-		echo $error[0] >> $log
+		Write-Output "Failed To Launch Elevated Script!" >> $Log
+		Write-Output $error[0] >> $Log
 	}
 }
 
 Else {
 
-	Write-Warning "$scriptdir\elevated.ps1 not found!"
-	echo "$scriptdir\elevated.ps1 not found!" >> $log
-	$elevatedscriptfailed = "1"
+	Write-Warning "$ScriptDir\elevated.ps1 not found!"
+	Write-Output "$ScriptDir\elevated.ps1 not found!" >> $Log
 }
 
 # Start DirectX Diagnostics Report
-
 Write-Host "Running DirectX Diagnostics..."
 
-Try { $dxdiag = Start-Process -FilePath "$env:SystemRoot\System32\dxdiag.exe" -ArgumentList "/dontskip","/whql:off","/t","$path\dxdiag.txt" -NoNewWindow -PassThru }
+Try {
+
+	$DxDiag = Start-Process -FilePath "$env:SystemRoot\System32\dxdiag.exe" -ArgumentList "/dontskip","/whql:off","/t","$Path\dxdiag.txt" -NoNewWindow -PassThru
+}
 
 Catch {
 
 	Write-Warning "Failed To Run DirectX Diagnostics!"
-	echo "Failed to run dxdiag.exe" >> $log
-	echo $error[0] >> $log
+	Write-Output "Failed to run dxdiag.exe" >> $Log
+	Write-Output $error[0] >> $Log
 }
 
 # Export Event Logs (2592000000 ms = 30 days)
-
 Write-Host "Exporting Application Event Log..."
-
-&"$env:SystemRoot\System32\wevtutil.exe" query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\application-events.txt 2>> $log
+&"$env:SystemRoot\System32\wevtutil.exe" query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $Path\Events\application-events.txt 2>> $Log
 
 Write-Host "Exporting System Event Log..."
-
-&"$env:SystemRoot\System32\wevtutil.exe" query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\system-events.txt 2>> $log
+&"$env:SystemRoot\System32\wevtutil.exe" query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $Path\Events\system-events.txt 2>> $Log
 
 Write-Host "Exporting WHEA Event Log..."
+&"$env:SystemRoot\System32\wevtutil.exe" query-events Microsoft-Windows-Kernel-WHEA/Errors /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $Path\Events\whea-events.txt 2>> $Log
 
-&"$env:SystemRoot\System32\wevtutil.exe" query-events Microsoft-Windows-Kernel-WHEA/Errors /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\whea-events.txt 2>> $log
-
-If ( $vernum -ge "6.3" ) {
+If ( $VerNum -ge "6.3" ) {
 
 	Write-Host "Exporting Kernel PnP Log..."
-
-	&"$env:SystemRoot\System32\wevtutil.exe" query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $path\Events\pnp-events.txt 2>> $log
+	&"$env:SystemRoot\System32\wevtutil.exe" query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $Path\Events\pnp-events.txt 2>> $Log
 }
 
 # Driver information
-
 Write-Host "Gathering Driver Information..."
+&"$env:SystemRoot\System32\driverquery.exe" /v /fo table 2>> $Log | Select-Object -Skip 1 > "$Path\driver-table.txt"
 
-&"$env:SystemRoot\System32\driverquery.exe" /v /fo table 2>> $log | Select-Object -Skip 1 > "$path\driver-table.txt"
-
-Get-WmiObject Win32_PnPSignedDriver 2>> $log | Select-Object DeviceName, FriendlyName, InfName, DriverVersion, IsSigned, DriverDate | Where-Object {$_.DeviceName -ne $null -or $_.FriendlyName -ne $null -or $_.InfName -ne $null } | Sort-Object DeviceName | Format-Table -AutoSize > "$path\driver-versions.txt"
+$DriverInfoAttributes = "DeviceName", "FriendlyName", "InfName", "DriverVersion", "IsSigned", "DriverDate"
+Get-WmiObject Win32_PnPSignedDriver 2>> $Log | Select-Object -Property $DriverInfoAttributes | Where-Object {$_.DeviceName -ne $null -or $_.FriendlyName -ne $null -or $_.InfName -ne $null } | Sort-Object DeviceName | Format-Table -AutoSize > "$Path\driver-versions.txt"
 
 # Get Default Power Plan
-
 Write-Host "Checking Power Settings..."
-
-&"$env:SystemRoot\System32\powercfg.exe" /list > "$path\power-plan.txt" 2>> $log
+&"$env:SystemRoot\System32\powercfg.exe" /list > "$Path\power-plan.txt" 2>> $Log
 
 # RAM info
-
 Write-Host "Getting Hardware Information..."
 
-Get-WmiObject Win32_PhysicalMemory 2>> $log | Select-Object BankLabel, DeviceLocator, Manufacturer, Capacity, ConfiguredClockspeed, ConfiguredVoltage, SerialNumber, PartNumber | Sort-Object BankLabel, DeviceLocator | Format-List > "$path\ram.txt"
+$MemoryAttributes = "BankLabel", "DeviceLocator", "Manufacturer", "Capacity", "ConfiguredClockspeed", "ConfiguredVoltage", "SerialNumber", "PartNumber"
+Get-WmiObject Win32_PhysicalMemory 2>> $Log | Select-Object $MemoryAttributes | Sort-Object BankLabel, DeviceLocator | Format-List > "$Path\ram.txt"
 
 # Processor information
-
-Get-WmiObject Win32_Processor 2>> $log | Select-Object Name, Description, Manufacturer, DeviceID, SocketDesignation, CurrentClockSpeed, CPUStatus, LastErrorCode, ErrorDescription, PartNumber, Revision, SerialNumber, ProcessorId, Status, StatusInfo, Stepping, CurrentVoltage, VoltageCaps | Format-List > "$path\cpu.txt"
+$ProcessorAttributes = "Name", "Description", "Manufacturer", "DeviceID", "SocketDesignation", "CurrentClockSpeed", "CPUStatus", `
+					   "LastErrorCode", "ErrorDescription", "PartNumber", "Revision", "SerialNumber", "ProcessorId", "Status", `
+					   "StatusInfo", "Stepping", "CurrentVoltage", "VoltageCaps"
+Get-WmiObject Win32_Processor 2>> $Log | Select-Object $ProcessorAttributes | Format-List > "$Path\cpu.txt"
 
 # Disk and partition information
-
 $DiskInfoCode=@'
 
 Public Class DiskInfo
@@ -338,200 +313,185 @@ End Class
 Add-Type $DiskInfoCode -Language VisualBasic
 
 $SizeGB = @{Name="Size (GB)";Expression={[math]::Round($_.Capacity / 1GB, 2)}}
-
 $FreeGB = @{Name="Free (GB)";Expression={[math]::Round($_.FreeSpace / 1GB, 2)}}
-
 $DevicePath = @{Name="Device Path";Expression={[diskinfo]::GetDeviceName($_.DriveLetter)}}
 
-Get-WmiObject Win32_Volume 2>> $log | Where-Object { $_.DriveLetter -ne $null } | Select-Object DriveLetter, $SizeGB, $FreeGB, $DevicePath | Sort-Object DriveLetter | Format-Table -AutoSize > "$path\partitions.txt"
+Get-WmiObject Win32_Volume 2>> $Log | Where-Object { $_.DriveLetter -ne $null } | Select-Object DriveLetter, $SizeGB, $FreeGB, $DevicePath | Sort-Object DriveLetter | Format-Table -AutoSize > "$Path\partitions.txt"
 
-If ( $vernum -ge "10.0" ) {
+If ( $VerNum -ge "10.0" ) {
 
-	Get-Partition 2>> $log | Format-List >> "$path\partitions.txt"
+	Get-Partition 2>> $Log | Format-List >> "$Path\partitions.txt"
 
-	$disknumbers = (Get-Disk).Number
-
-	ForEach ( $number in $disknumbers ) { Get-Disk -Number $number 2>> $log | Select-Object FriendlyName, Model, SerialNumber, Manufacturer, Number, IsBoot, AllocatedSize, HealthStatus, OperationalStatus, BusType, FirmwareVersion, PartitionStyle, Path | Format-List >> "$path\disks.txt" }
+	$DiskNumbers = (Get-Disk).Number
+	$DiskAttributes = "FriendlyName", "Model", "SerialNumber", "Manufacturer", "Number", "IsBoot", "AllocatedSize", `
+					  "HealthStatus", "OperationalStatus", "BusType", "FirmwareVersion", "PartitionStyle", "Path"
+	ForEach ( $DiskNumber in $DiskNumbers ) { Get-Disk -Number $DiskNumber 2>> $Log | Select-Object $DiskAttributes | Format-List >> "$Path\disks.txt" }
 }
 
 # System Board information
+$BaseBoarAttributes = "Product", "Model", "Version", "Manufacturer", "Description"
+Get-WmiObject Win32_BaseBoard 2>> $Log | Select-Object $BaseBoarAttributes | Format-List > "$Path\motherboard.txt"
 
-Get-WmiObject Win32_BaseBoard 2>> $log | Select-Object Product, Model, Version, Manufacturer, Description | Format-List > "$path\motherboard.txt"
-
-Get-WmiObject Win32_Bios 2>> $log | Select-Object SMBIOSBIOSVersion, Manufacturer, Name, Version, BIOSVersion, ReleaseDate | Format-List >> "$path\motherboard.txt"
+$BiosAttributes = "SMBIOSBIOSVersion", "Manufacturer", "Name", "Version", "BIOSVersion", "ReleaseDate"
+Get-WmiObject Win32_Bios 2>> $Log | Select-Object $BiosAttributes | Format-List >> "$Path\motherboard.txt"
 
 # GPU information
-
-Get-WmiObject Win32_VideoController 2>> $log | Select-Object Name, DeviceID, PNPDeviceID, VideoProcessor, CurrentRefreshRate, VideoModeDescription, AdapterRAM, DriverVersion, InfFilename, InstalledDisplayDrivers, InstallDate, DriverDate, Status, StatusInfo, LastErrorCode, ErrorDescription | Format-List > "$path\gpu.txt"
+$GpuAttributes = "Name", "DeviceID", "PNPDeviceID", "VideoProcessor", "CurrentRefreshRate", "VideoModeDescription", "AdapterRAM", `
+				 "DriverVersion", "InfFilename", "InstalledDisplayDrivers", "InstallDate", "DriverDate", "Status", "StatusInfo", `
+				 "LastErrorCode", "ErrorDescription"
+Get-WmiObject Win32_VideoController 2>> $Log | Select-Object $GpuAttributes | Format-List > "$Path\gpu.txt"
 
 # Windows license information
-
 Write-Host "Finding Windows License Information..."
-
-&"$env:SystemRoot\System32\cscript.exe" $env:SystemRoot\System32\slmgr.vbs /dlv 2>> $log | Select-Object -Skip 4 > "$path\windows-license-info.txt"
+&"$env:SystemRoot\System32\cscript.exe" $env:SystemRoot\System32\slmgr.vbs /dlv 2>> $Log | Select-Object -Skip 4 > "$Path\windows-license-info.txt"
 
 # Installed software, first check native and then 32-bit (if it exists).
-
 Write-Host "Listing Installed Software..."
 
-Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | Sort-Object DisplayName | Format-Table -AutoSize > "$path\installed-software.txt"
+$SoftwareAttributes = "DisplayName", "DisplayVersion", "Publisher", "InstallDate"
+Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $Log | Select-Object $SoftwareAttributes | `
+Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | `
+Sort-Object DisplayName | Format-Table -AutoSize > "$Path\installed-software.txt"
 
-If ( Test-Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall" ) {
+If ( Test-Path -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall" ) {
 
-	echo "32-bit Software" >> "$path\installed-software.txt"
+	Write-Output "32-bit Software" >> "$Path\installed-software.txt"
 
-	Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | Sort-Object DisplayName | Format-Table -AutoSize | Format-Table -AutoSize >> "$path\installed-software.txt"
+	Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $Log | Select-Object $SoftwareAttributes | Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | Sort-Object DisplayName | Format-Table -AutoSize | Format-Table -AutoSize >> "$Path\installed-software.txt"
 }
 
-echo "User-specific Software" >> "$path\installed-software.txt"
+Write-Output "User-specific Software" >> "$Path\installed-software.txt"
+Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $Log | Select-Object $SoftwareAttributes | Where-Object {$_.DisplayName -ne $null} | Sort-Object DisplayName | Format-Table -AutoSize >> "$Path\installed-software.txt"
 
-Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" 2>> $log | Select-Object DisplayName, DisplayVersion, Publisher, InstallDate | Where-Object {$_.DisplayName -ne $null} | Sort-Object DisplayName | Format-Table -AutoSize >> "$path\installed-software.txt"
-
-echo "Installed Windows Components" >> "$path\installed-software.txt"
-
-Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\*" 2>> $log | Select-Object "(Default)", ComponentID, Version, Enabled | Where-Object {$_."(Default)" -ne $null -or $_.ComponentID -ne $null} | Sort-Object "(default)" | Format-Table -AutoSize >> "$path\installed-software.txt"
+Write-Output "Installed Windows Components" >> "$Path\installed-software.txt"
+Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\*" 2>> $Log | Select-Object "(Default)", ComponentID, Version, Enabled | Where-Object {$_."(Default)" -ne $null -or $_.ComponentID -ne $null} | Sort-Object "(default)" | Format-Table -AutoSize >> "$Path\installed-software.txt"
 
 # Installed Windows Updates
-
 Write-Host "Listing Installed Windows Updates..."
-
-Get-WmiObject Win32_QuickFixEngineering 2>> $log | Select-Object HotFixID,Description,InstalledOn | Sort-Object InstalledOn,HotFixID | Format-Table -AutoSize > "$path\windows-updates.txt"
+Get-WmiObject Win32_QuickFixEngineering 2>> $Log | Select-Object HotFixID,Description,InstalledOn | Sort-Object InstalledOn,HotFixID | Format-Table -AutoSize > "$Path\windows-updates.txt"
 
 # Basic networking information
-
 Write-Host "Finding Network Information..."
-
-&"$env:SystemRoot\System32\ipconfig.exe" /allcompartments /all 2>> $log | Select-Object -Skip 1 > "$path\network-info.txt"
-
-&"$env:SystemRoot\System32\route.exe" print >> "$path\network-info.txt" 2>> $log
+&"$env:SystemRoot\System32\ipconfig.exe" /allcompartments /all 2>> $Log | Select-Object -Skip 1 > "$Path\network-info.txt"
+&"$env:SystemRoot\System32\route.exe" print >> "$Path\network-info.txt" 2>> $Log
 
 # Copy relevant entries from the hosts file
-
 Write-Host "Examining Hosts File..."
 
-If ( Test-Path "$env:SystemRoot\System32\drivers\etc\hosts" ) {
+If ( Test-Path -Path "$env:SystemRoot\System32\drivers\etc\hosts" ) {
 
-	Get-Content -Path "$env:SystemRoot\System32\drivers\etc\hosts" 2>> $log | Select-String '(127.0.0.1)|(0.0.0.0)' > "$path\hosts.txt"
+	Get-Content -Path "$env:SystemRoot\System32\drivers\etc\hosts" 2>> $Log | Select-String '(127.0.0.1)|(0.0.0.0)' > "$Path\hosts.txt"
 }
 
-Else { echo "Hosts file not found." >> $log }
+Else { Write-Output "Hosts file not found." >> $Log }
 
 # Wait if dxdiag.exe has not finished, kill process if timeout is reached
+If ( $DxDiag -ne $null ) {
 
-If ( $dxdiag -ne $null ) {
-
-	waitloop $dxdiag dxdiag.exe 30 "$path\dxdiag.txt"
+	WaitFor-Process $DxDiag dxdiag.exe 30 "$Path\dxdiag.txt"
 }
 
 # Wait if msinfo32.exe has not finished, kill process if timeout is reached
+If ( $MsInfo32 -ne $null ) {
 
-If ( $msinfo32 -ne $null ) {
-
-	waitloop $msinfo32 msinfo32.exe 120 "$path\msinfo32.nfo"
+	WaitFor-Process $MsInfo32 msinfo32.exe 120 "$Path\msinfo32.nfo"
 }
 
-# Wait if the elevated script has not finished, kill process if timeout is reached
 
-If ( $elevated_script -ne $null ) {
+If ( $ElevatedScript -ne $null ) {
 
-	waitloop $elevated_script "Elevated Script" 120
+	WaitFor-Process $ElevatedScript "Elevated Script" 120
 }
 
-# Move log into $path if it is non-empty
+# Move log into $Path if it is non-empty
+If ( $(Test-Path -Path $Log) -eq "True" -and (Get-Item $Log).Length -gt 0 ) {
 
-If ( $(Test-Path "$log") -eq "True" -and (Get-Item "$log").Length -gt 0 ) {
-
-	Move-Item "$log" -Destination "$path"
+	Move-Item -Path $Log -Destination $Path
 }
 
 # Get hash of files to later check for corruption
-
 $FileName = @{Name="FileName";Expression={Split-Path $_.Path -Leaf}}
 
-If ( $vernum -ge "6.3" ) {
+If ( $VerNum -ge "6.3" ) {
 
-	Get-ChildItem -Path "$path" -Recurse -Exclude "*.wer" | Get-FileHash -Algorithm SHA256 | Select-Object $FileName, Hash, Algorithm | Sort-Object FileName | Format-Table -AutoSize > "$env:LOCALAPPDATA\hashes.txt"
+	Get-ChildItem -Path "$Path" -Recurse -Exclude "*.wer" | Get-FileHash -Algorithm SHA256 | Select-Object $FileName, Hash, Algorithm | Sort-Object FileName | Format-Table -AutoSize > "$env:LOCALAPPDATA\hashes.txt"
 }
 
-If ( Test-Path "$env:LOCALAPPDATA\hashes.txt" ) {
+If ( Test-Path -Path "$env:LOCALAPPDATA\hashes.txt" ) {
 
-	Move-Item -Path "$env:LOCALAPPDATA\hashes.txt" -Destination "$path"
+	Move-Item -Path "$env:LOCALAPPDATA\hashes.txt" -Destination $Path
 }
 
 # Compress output folder
+$CompressionResult = Compress-Folder $Path $Zip
 
-$compressionresult = compression "$path" "$zip"
+# Check that $Zip does not exceed 8MB, try to reduce filesize by removing the largest file then compressing, give up after 4 iterations.
+$Count = 0
 
-# Check that $zip does not exceed 8MB, try to reduce filesize by removing the largest file then compressing, give up after 4 iterations.
+While ( $((Get-Item $Zip).Length -ge 8MB) -eq $True -and $Count -lt 4 ) {
 
-$count = 0
+	If ( !(Test-Path -Path $Overflow) ) {
 
-While ( $((Get-Item $zip).Length -ge 8MB) -eq $True -and $count -lt 4 ) {
-
-	If ( !(Test-Path $overflow) ) {
-
-		New-Item -ItemType Directory "$overflow" -Force 2>> "$path\script-log.log" > $null
+		New-Item -ItemType Directory "$Overflow" -Force 2>> "$Path\script-log.log" > $null
 	}
 
-	Remove-Item -Force $zip
+	Remove-Item -Force $Zip
 
-	Write-Warning "Size of $zip met or exceeded 8MB limit!"
-	echo "Size of $zip met or exceeded 8MB limit!" >> "$path\script-log.log"
+	Write-Warning "Size of $Zip met or exceeded 8MB limit!"
+	Write-Output "Size of $Zip met or exceeded 8MB limit!" >> "$Path\script-log.log"
 
-	$trimmedfile = (Get-ChildItem -Recurse -File -Exclude script-log.log, script-log-elevated.log -Path $path | Sort-Object Length -Descending | Select-Object -First 1).FullName
+	$TrimmedFile = (Get-ChildItem -Recurse -File -Exclude script-log.log, script-log-elevated.log -Path $Path | Sort-Object Length -Descending | Select-Object -First 1).FullName
 
-	echo "Moving the following file to $overflow  to lower the .zip size:" >> "$path\script-log.log"
-	echo $trimmedfile >> "$path\script-log.log"
+	Write-Output "Moving the following file to $Overflow  to lower the .zip size:" >> "$Path\script-log.log"
+	Write-Output $TrimmedFile >> "$Path\script-log.log"
 
-	Move-Item -Force -Path $trimmedfile -Destination $overflow
+	Move-Item -Force -Path $TrimmedFile -Destination $Overflow
 
 	Write-Host "Retrying compression..."
-	echo "Retrying compression." >> "$path\script-log.log"
+	Write-Output "Retrying compression." >> "$Path\script-log.log"
 
-	$compressionresult = compression "$path" "$zip"
+	$CompressionResult = compression $Path $Zip
 
-	$count++
+	$Count++
 }
 
-If ( $count -ge 4 ) {
+If ( $Count -ge 4 ) {
 
 	Write-Warning "Unable to shrink .zip below 8MB"
-	echo "Unable to shrink .zip below 8MB" >> "$path\script-log.log"
+	Write-Output "Unable to shrink .zip below 8MB" >> "$Path\script-log.log"
 }
 
-# Compress overflow directory if it exists
+# Compress Overflow directory if it exists
+If ( Test-Path -Path $Overflow ) {
 
-If ( Test-Path $overflow ) {
-
-	$overflowcompression = compression "$overflow" "$overflowzip"
+	$OverflowCompression = compression $Overflow $Overflowzip
 }
 
 # Check that the .zip file was created and the compression operation completed successfully before removing the uncompressed directory
-
 Write-Host "`n"
 
-If ( $(Test-Path "$zip") -eq "True" -and "$compressionresult" -eq "True" ) {
+If ( $(Test-Path -Path $Zip) -eq "True" -and $CompressionResult -eq "True" ) {
 
-	Remove-Item -Recurse -Force "$path"
-	Write-Host "Output location: $zip" 
+	Remove-Item -Recurse -Force "$Path"
+	Write-Host "Output location: $Zip" 
 }
 
 Else {
 
 	Write-Host "Compression Failed!"
 	Write-Host "`n"
-	Write-Host "Output location: $path"
+	Write-Host "Output location: $Path"
 }
 
-If ( $(Test-Path $overflowzip) -eq "True" -and $overflowcompression -eq "True" ) {
+If ( $(Test-Path -Path $Overflowzip) -eq "True" -and $OverflowCompression -eq "True" ) {
 
-	Remove-Item -Recurse -Force "$overflow"
-	Write-Host "Second Output Location: $overflowzip"
+	Remove-Item -Recurse -Force "$Overflow"
+	Write-Host "Second Output Location: $Overflowzip"
 }
 
-ElseIf ( $(Test-Path $overflowzip) -eq "True" -and $overflowcompression -ne "True" ) {
+ElseIf ( $(Test-Path -Path $Overflowzip) -eq "True" -and $OverflowCompression -ne "True" ) {
 
-	Write-Host "Second Output Location: $overflow"
+	Write-Host "Second Output Location: $Overflow"
 }
 
 Write-Host "`n"
