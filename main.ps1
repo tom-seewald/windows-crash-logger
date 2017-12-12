@@ -21,9 +21,12 @@ Function WaitFor-Process ( $Process, $Name, $TimeoutSeconds, $OutputFilePath ) {
 
 		Stop-Process -Force -Id $Process.Id 2>> $Log
 
-		If ( "$OutputFilePath" -ne $null ) {
+		If ( $OutputFilePath -ne $null ) {
 
-			Remove-Item "$OutputFilePath" 2>> $Log
+			If ( Test-Path -Path $OutputFilePath ) {
+
+				Remove-Item "$OutputFilePath" 2>> $Log
+			}
 		}
 
 		Write-Output "Killed $name due to timeout." >> $Log
@@ -40,7 +43,7 @@ Function Compress-Folder ( $InputPath, $OutputPath ) {
 
 			Write-Host "Compressing Folder..."
 			Add-Type -Assembly "system.io.compression.filesystem"
-			[io.compression.zipfile]::CreateFromDirectory("$inputpath","$OutputPath")
+			[io.compression.zipfile]::CreateFromDirectory("$inputpath","$OutputPath") 2>> "$Path\script-log.log"
 			$Compression = $?
 			Return $?
 		}
@@ -48,8 +51,8 @@ Function Compress-Folder ( $InputPath, $OutputPath ) {
 		Catch {
 
 			Write-Warning "Failed to compress the folder with io.compression!"
-			Write-Output "Failed to compress the folder with io.compression!" >> $Log
-			Write-Output $error[0] >> $Log
+			Write-Output "Failed to compress the folder with io.compression!" >> "$Path\script-log.log"
+			Write-Output $error[0] >> "$Path\script-log.log"
 
 			If ( Test-Path -Path $OutputPath ) {
 			
@@ -66,15 +69,15 @@ Function Compress-Folder ( $InputPath, $OutputPath ) {
 		Try {
 
 			Write-Host "Compressing Folder..."
-			&"$env:SystemRoot\System32\cscript.exe" "$ScriptDir\compression.vbs" "$inputpath" "$OutputPath" > $null 2>> $Log
+			&"$env:SystemRoot\System32\cscript.exe" "$ScriptDir\compression.vbs" "$inputpath" "$OutputPath" > $null 2>> "$Path\script-log.log"
 			Return $?
 		}
 
 		Catch {
 
 			Write-Warning "Failed to compress the folder with vbscript!"
-			Write-Output "Failed to compress the folder with vbscript!" >> $Log
-			Write-Output $error[0] >> $Log
+			Write-Output "Failed to compress the folder with vbscript!" >> "$Path\script-log.log"
+			Write-Output $error[0] >> "$Path\script-log.log"
 
 			If ( Test-Path -Path $OutputPath ) {
 			
@@ -87,7 +90,7 @@ Function Compress-Folder ( $InputPath, $OutputPath ) {
 
 	Else {
 
-		Write-Output "Could not find $ScriptDir\compression.vbs" >> $Log
+		Write-Output "Could not find $ScriptDir\compression.vbs" >> "$Path\script-log.log"
 		Write-Warning "Could not find compression.vbs"
 		Return "False"
 	}
@@ -145,7 +148,7 @@ $ScriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
 $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size (1000,1000)
 
 # Version String
-$ScriptVer = "Beta07 - 12/10/17"
+$ScriptVer = "Beta07 - 12/11/17"
 
 # Startup Banner
 Clear-Host
@@ -325,7 +328,10 @@ If ( $VerNum -ge "10.0" ) {
 	$DiskNumbers = (Get-Disk).Number
 	$DiskAttributes = "FriendlyName", "Model", "SerialNumber", "Manufacturer", "Number", "IsBoot", "AllocatedSize", `
 					  "HealthStatus", "OperationalStatus", "BusType", "FirmwareVersion", "PartitionStyle", "Path"
-	ForEach ( $DiskNumber in $DiskNumbers ) { Get-Disk -Number $DiskNumber 2>> $Log | Select-Object $DiskAttributes | Format-List >> "$Path\disks.txt" }
+	ForEach ( $DiskNumber in $DiskNumbers ) {
+
+		Get-Disk -Number $DiskNumber 2>> $Log | Select-Object $DiskAttributes | Format-List >> "$Path\disks.txt"
+	}
 }
 
 # System Board information
@@ -383,7 +389,10 @@ If ( Test-Path -Path "$env:SystemRoot\System32\drivers\etc\hosts" ) {
 	Get-Content -Path "$env:SystemRoot\System32\drivers\etc\hosts" 2>> $Log | Select-String '(127.0.0.1)|(0.0.0.0)' > "$Path\hosts.txt"
 }
 
-Else { Write-Output "Hosts file not found." >> $Log }
+Else {
+
+	Write-Output "Hosts file not found." >> $Log
+}
 
 # Wait if dxdiag.exe has not finished, kill process if timeout is reached
 If ( $DxDiag -ne $null ) {
@@ -397,7 +406,7 @@ If ( $MsInfo32 -ne $null ) {
 	WaitFor-Process $MsInfo32 msinfo32.exe 120 "$Path\msinfo32.nfo"
 }
 
-
+# Wait if elevated.ps1 has not finished, kill the script if timeout is reached
 If ( $ElevatedScript -ne $null ) {
 
 	WaitFor-Process $ElevatedScript "Elevated Script" 120
