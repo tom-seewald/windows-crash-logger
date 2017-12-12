@@ -303,7 +303,7 @@ Else {
 	Catch {
 
 		Write-Warning "Failed To Download autorunsc. Skipping..."
-		Write-Output "Failed to download autrunsc." >> $ElevatedLog
+		Write-Output "Failed to download autorunsc." >> $ElevatedLog
 		Write-Output $error[0] >> $ElevatedLog
 
 		# Cleanup if the download fails
