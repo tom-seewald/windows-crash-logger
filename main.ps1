@@ -43,7 +43,7 @@ Function Compress-Folder ( $InputPath, $OutputPath ) {
 
 			Write-Host "Compressing Folder..."
 			Add-Type -Assembly "system.io.compression.filesystem"
-			[io.compression.zipfile]::CreateFromDirectory("$inputpath","$OutputPath") 2>> "$Path\script-log.log"
+			[io.compression.zipfile]::CreateFromDirectory("$inputpath","$OutputPath")
 			$Compression = $?
 			Return $?
 		}
@@ -69,7 +69,7 @@ Function Compress-Folder ( $InputPath, $OutputPath ) {
 		Try {
 
 			Write-Host "Compressing Folder..."
-			&"$env:SystemRoot\System32\cscript.exe" "$ScriptDir\compression.vbs" "$inputpath" "$OutputPath" > $null 2>> "$Path\script-log.log"
+			&"$env:SystemRoot\System32\cscript.exe" "$ScriptDir\compression.vbs" "$inputpath" "$OutputPath" > $null
 			Return $?
 		}
 
