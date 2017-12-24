@@ -2,14 +2,38 @@
 # Script Written By Spectrum #
 ##############################
 
-Param([Parameter(Mandatory=$True)][string]$Path)
+Param(
+	[Parameter(Mandatory=$True)]
+	[string]
+	$Path
+)
 
-# Set output file for logging
-$ElevatedLog = "$env:TEMP\script-log-elevated.log"
+# This is set because $PSScriptRoot is not available on stock Windows 7 SP1
+$ScriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
 
-If ( Test-Path -Path $ElevatedLog ) {
+# Set output files for logging
+$Log = "$env:TEMP\script-log-elevated.csv"
+$ErrorFile = "$env:TEMP\error-temp-elevated.txt"
+New-Item -ItemType File -Path $ErrorFile -Force -ErrorAction Stop > $null
 
-	Remove-Item -Force $ElevatedLog
+If ( Test-Path -Path $Log ) {
+
+	Remove-Item -Force $Log
+}
+
+# Import custom module containing support functions
+Try {
+
+    Import-Module "$ScriptDir\logger-module.psm1"
+}
+
+Catch {
+
+	Write-Warning "Could not import $ScriptDir\test-module.psm1, exiting script."
+	$TimeStamp = (Get-Date).ToString("yyyy/MM/dd HH:mm:ss")
+    $ImportError =  $TimeStamp + "," + "Failed to import $ScriptDir\test-module.psm1, exiting script."
+    Write-Output $ImportError >> $Log
+    Exit
 }
 
 # Check that this script is being run with elevated credentials, e.g. Administrator, SYSTEM, or TrustedInstaller
@@ -19,7 +43,7 @@ If ( $ElevatedCheck -ne "True" ) {
 
 	Write-Warning "ERROR: Administrator rights are required for this script to work properly!"
 	Write-Warning "Aborting script!"
-	Write-Output "Administrator rights are required for this script to work properly, exiting script." >> $ElevatedLog
+	Write-Log "Administrator rights are required for this script to work properly, exiting script." $Log
 	Exit
 }
 
@@ -30,8 +54,7 @@ Try {
 
 		Write-Warning "Invalid path specified!"
 		Write-Warning "Aborting script!"
-		Write-Output "Path is invalid. Script aborted!" >> $ElevatedLog
-		Write-Output "Path variable is $Path" >> $ElevatedLog
+		Write-Log "Path is invalid. Script aborted! Path variable is $Path" $Log
 		Exit
 	}
 }
@@ -40,8 +63,7 @@ Catch {
 
 	Write-Warning "Invalid path specified!"
 	Write-Warning "Aborting script!"
-	Write-Output "Path is invalid. Script aborted!" >> $ElevatedLog
-	Write-Output "Path variable is $Path" >> $ElevatedLog
+	Write-Log "Path is invalid. Script aborted! Path variable is $Path" $Log
 	Exit
 }
 
@@ -50,16 +72,14 @@ $MajorVer=[System.Environment]::OSVersion.Version.Major
 $MinorVer=[System.Environment]::OSVersion.Version.Minor
 $VerNum = "$MajorVer" + "." + "$MinorVer" -as [decimal]
 
-# This is set because $PSScriptRoot is not available on stock Windows 7 SP1
-$ScriptDir = Split-Path $MyInvocation.MyCommand.Path -Parent
-
 # Set window size to 1000 by 1000 to avoid truncation when sending output to files
 $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size (1000,1000)
 
 # Get crash dump settings and append crash dump type matrix
 Write-Host "Getting Crash Dump Settings..."
 Write-Output "########################## Crash Dump Settings #########################" > "$Path\Crash Dumps\crash-dump-settings.txt"
-Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl" >> "$Path\Crash Dumps\crash-dump-settings.txt" 2>> $ElevatedLog
+Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl" >> "$Path\Crash Dumps\crash-dump-settings.txt" -ErrorAction SilentlyContinue -ErrorVariable ScriptError
+Write-Log $ScriptError $Log
 
 Write-Output "######################## Crash Dump Type Matrix ########################
 
@@ -86,7 +106,8 @@ If ( $DefaultPath -eq $MinidumpPath ) {
 
 			Write-Host "Copying Crash Dumps from $MinidumpPath..."
 
-			Get-ChildItem -Filter "*.dmp" -Path "$MinidumpPath" | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$Path\Crash Dumps" } 2>> $ElevatedLog
+			Get-ChildItem -Filter "*.dmp" -Path "$MinidumpPath" | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$Path\Crash Dumps" } -ErrorAction SilentlyContinue -ErrorVariable ScriptError
+			Write-Log $ScriptError $Log
 		}
 
 		Else {
@@ -116,7 +137,8 @@ Else {
 		If ( $(Get-ChildItem -Filter "*.dmp" -Path "$MinidumpPath") -ne $null ) {
 
 			Write-Host "Copying Crash Dumps from $MinidumpPath..."
-			Get-ChildItem -Filter "*.dmp" -Path "$MinidumpPath" | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$Path\Crash Dumps" } 2>> $ElevatedLog
+			Get-ChildItem -Filter "*.dmp" -Path "$MinidumpPath" | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$Path\Crash Dumps" } -ErrorAction SilentlyContinue -ErrorVariable ScriptError
+			Write-Log $ScriptError $Log
 		}
 
 		Else {
@@ -139,7 +161,8 @@ Else {
 		If ( $(Get-ChildItem -Filter "*.dmp" -Path "$DefaultPath") -ne $null ) {
 
 			Write-Host "Copying Crash Dumps from $DefaultPath..."
-			Get-ChildItem -Filter "*.dmp" -Path "$DefaultPath"  | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$Path\Crash Dumps" } 2>> $ElevatedLog
+			Get-ChildItem -Filter "*.dmp" -Path "$DefaultPath"  | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$Path\Crash Dumps" } -ErrorAction SilentlyContinue -ErrorVariable ScriptError
+			Write-Log $ScriptError $Log
 		}
 
 		Else {
@@ -205,36 +228,42 @@ Else {
 If ( $(Test-Path -Path "$env:SystemRoot\LiveKernelReports") -eq $True -and $(Get-ChildItem -Path "$env:SystemRoot\LiveKernelReports" ) -ne $null ) {
 
 	$LengthMB = @{Name="Size (MB)";Expression={[math]::Round($_.Length / 1MB, 2)}}
-	Get-ChildItem -Path "$env:SystemRoot\LiveKernelReports" 2>> $ElevatedLog | Select-Object Name,LastWriteTime,$LengthMB > "$Path\Crash Dumps\live-kernel-reports.txt"
+	Get-ChildItem -Path "$env:SystemRoot\LiveKernelReports" -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object Name,LastWriteTime,$LengthMB > "$Path\Crash Dumps\live-kernel-reports.txt"
+	Write-Log $ScriptError $Log
 }
 
 # Gather a System Power Report, only supported on 8.1 and newer
 If ( $VerNum -ge "6.3" ) {
 
 	Write-Host "Running System Power Report..."
-	&"$env:SystemRoot\System32\powercfg.exe" /sleepstudy /output "$Path\power-report.html" > $null 2>> $ElevatedLog
+	&"$env:SystemRoot\System32\powercfg.exe" /sleepstudy /output "$Path\power-report.html" > $null 2> $ErrorFile
+	Write-CommandError $ErrorFile $Log
 }
 
 # Disk and partition information, 8.1 requires admin rights unlike 10
 If ( $VerNum -eq "6.3" ) {
 
-	Get-Partition 2>> $ElevatedLog | Format-List >> "$Path\partitions.txt"
+	Get-Partition -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Format-List >> "$Path\partitions.txt"
+	Write-Log $ScriptError $Log
 	
 	$DiskAttributes = "FriendlyName", "Model", "Manufacturer", "Number", "IsBoot", "AllocatedSize", "HealthStatus", "OperationalStatus", "BusType", "FirmwareVersion", "PartitionStyle", "Path"
-	Get-Disk 2>> $ElevatedLog | Select-Object $DiskAttributes | Format-List >> "$Path\disks.txt"
+	Get-Disk -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $DiskAttributes | Format-List >> "$Path\disks.txt"
+	Write-Log $ScriptError $Log
 }
 
 # List PnP devices and associated information
 Write-Host "Listing PnP Devices..."
 
 $DriverAttributes = "Name", "Status", "ConfigManagerErrorCode", "Description", "Manufacturer", "DeviceID"
-Get-WmiObject Win32_PNPEntity 2>> $ElevatedLog | Select-Object $DriverAttributes | Sort-Object Name | Format-Table -AutoSize >> "$Path\pnp-devices.txt"
+Get-WmiObject Win32_PNPEntity -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $DriverAttributes | Sort-Object Name | Format-Table -AutoSize >> "$Path\pnp-devices.txt"
+Write-Log $ScriptError $Log
 
 # List all processes
 Write-Host "Enumerating Running Processes..."
 
 $ProcessAttributes = "ProcessName", "ProcessID", "SessionId", "Priority", "CommandLine"
-Get-WmiObject Win32_Process 2>> $ElevatedLog | Select-Object $ProcessAttributes | Sort-Object ProcessName,ProcessId | Format-Table -AutoSize > "$Path\processes.txt"
+Get-WmiObject Win32_Process -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $ProcessAttributes | Sort-Object ProcessName,ProcessId | Format-Table -AutoSize > "$Path\processes.txt"
+Write-Log $ScriptError $Log
 
 # List all services including status, pid, only Windows 10 has support for listing service StartType via Get-Service
 Write-Host "Identifying Running Services..."
@@ -243,12 +272,14 @@ If ( $VerNum -ge "10.0" ) {
 
 	$StartType = @{Name="StartType";Expression={(Get-Service $_.Name).StartType}}
 	
-	Get-WmiObject Win32_Service 2>> $ElevatedLog | Select-Object Name, DisplayName, State, ProcessID, $StartType | Sort-Object State, Name | Format-Table -AutoSize > "$Path\services.txt"	
+	Get-WmiObject Win32_Service -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object Name, DisplayName, State, ProcessID, $StartType | Sort-Object State, Name | Format-Table -AutoSize > "$Path\services.txt"
+	Write-Log $ScriptError $Log	
 }
 
 Else {
 
-	Get-WmiObject Win32_Service 2>> $ElevatedLog | Select-Object Name, DisplayName, State, ProcessID | Sort-Object State, Name | Format-Table -AutoSize > "$Path\services.txt"
+	Get-WmiObject Win32_Service -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object Name, DisplayName, State, ProcessID | Sort-Object State, Name | Format-Table -AutoSize > "$Path\services.txt"
+	Write-Log $ScriptError $Log
 }
 
 # Copy Windows Error Reports
@@ -256,12 +287,14 @@ Write-Host "Copying Windows Error Reports..."
 
 If ( Test-Path -Path "$home\AppData\Local\Microsoft\Windows\WER\ReportArchive" ) {
 
-	Copy-Item -Recurse "$home\AppData\Local\Microsoft\Windows\WER\ReportArchive\*" -Destination "$Path\Error Reports" > $null 2>> $ElevatedLog
+	Copy-Item -Recurse "$home\AppData\Local\Microsoft\Windows\WER\ReportArchive\*" -Destination "$Path\Error Reports" > $null -ErrorAction SilentlyContinue -ErrorVariable ScriptError
+	Write-Log $ScriptError $Log
 }
 
 If ( Test-Path -Path "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportArchive" ) {
 
-	Copy-Item -Recurse "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportArchive\*" -Destination "$Path\Error Reports" > $null 2>> $ElevatedLog
+	Copy-Item -Recurse "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportArchive\*" -Destination "$Path\Error Reports" > $null -ErrorAction SilentlyContinue -ErrorVariable ScriptError
+	Write-Log $ScriptError $Log
 }
 
 # Download and run autorunsc.exe
@@ -274,14 +307,15 @@ If ( $VerNum -ge "6.3" ) {
 
 		# This remove the progress bar, which slows the download to a crawl if enabled
 		$ProgressPreference = 'SilentlyContinue'
-		Invoke-WebRequest -Uri $AutorunsUrl -OutFile "$ScriptDir\autorunsc.exe" -TimeoutSec 10 2>> $ElevatedLog
+		Invoke-WebRequest -Uri $AutorunsUrl -OutFile "$ScriptDir\autorunsc.exe" -TimeoutSec 10 -ErrorAction SilentlyContinue -ErrorVariable ScriptError
+		Write-Log $ScriptError $Log
 	}
 
 	Catch {
 
 		Write-Warning "Failed To Download autorunsc. Skipping..."
-		Write-Output "Failed to download autrunsc." >> $ElevatedLog
-		Write-Output $error[0] >> $ElevatedLog
+		Write-Log "Failed to download autrunsc." $Log
+		Write-Log $error[0] $Log
 
 		# Cleanup if the download fails
 		If ( Test-Path -Path "$ScriptDir\autorunsc.exe" ) {
@@ -295,16 +329,16 @@ Else {
 
 	Try {
 
-		$autorunsurl = "http://live.sysinternals.com/autorunsc.exe"
+		$AutorunsUrl = "http://live.sysinternals.com/autorunsc.exe"
 		$WebClient = New-Object System.Net.WebClient
-		$WebClient.DownloadFile($AutorunsUrl,"$ScriptDir\autorunsc.exe") 2>> $ElevatedLog
+		$WebClient.DownloadFile($AutorunsUrl,"$ScriptDir\autorunsc.exe")
 	}
 
 	Catch {
 
 		Write-Warning "Failed To Download autorunsc. Skipping..."
-		Write-Output "Failed to download autorunsc." >> $ElevatedLog
-		Write-Output $error[0] >> $ElevatedLog
+		Write-Log "Failed to download autorunsc." $Log
+		Write-Log $error[0] $Log
 
 		# Cleanup if the download fails
 		If ( Test-Path -Path "$ScriptDir\autorunsc.exe" ) {
@@ -319,12 +353,13 @@ If ( Test-Path -Path "$ScriptDir\autorunsc.exe" ) {
 	Write-Host "Finding Auto-Start Entries..."
 
 	# -s -m List all autostart entries that are not cryptographically signed by Microsoft, -a = specify autostart selection, b = boot execute, d = Appinit DLLs, w = winlogon, h = image hijacks, e = explorer add-ons, l = logon, t = scheduled tasks
-	Start-Process -FilePath "$ScriptDir\autorunsc.exe" -ArgumentList "-accepteula","-nobanner","-s","-m","-a","bdwhelt" -NoNewWindow -Wait -RedirectStandardOutput "$Path\autorun.txt" 2>> $ElevatedLog
+	Start-Process -FilePath "$ScriptDir\autorunsc.exe" -ArgumentList "-accepteula","-nobanner","-s","-m","-a","bdwhelt" -NoNewWindow -Wait -RedirectStandardOutput "$Path\autorun.txt" -RedirectStandardError $ErrorFile
+	Write-CommandError $ErrorFile $Log
 }
 
 Else {
 
-	Write-Output "$ScriptDir\autorunsc.exe not found." >> $ElevatedLog
+	Write-Log "$ScriptDir\autorunsc.exe not found." $Log
 }
 
 If ( Test-Path -Path "$ScriptDir\autorunsc.exe" ) {
@@ -333,7 +368,9 @@ If ( Test-Path -Path "$ScriptDir\autorunsc.exe" ) {
 }
 
 # Move log into $Path if it is non-empty
-If ( $(Test-Path -Path $ElevatedLog) -eq "True" -and (Get-Item $ElevatedLog).Length -gt 0 ) {
+If ( $(Test-Path -Path $Log) -eq "True" -and (Get-Item $Log).Length -gt 0 ) {
 
-	Move-Item -Path $ElevatedLog -Destination $Path
+	Move-Item -Path $Log -Destination $Path
 }
+
+If ( Test-Path -Path $ErrorFile ) { Remove-Item -Force $ErrorFile 2> $null }
