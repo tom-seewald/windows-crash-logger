@@ -368,7 +368,10 @@ Else {
     Write-Host "Output location: $Path"
 }
 
-If ( Test-Path -Path $ErrorFile ) { Remove-Item -Force $ErrorFile 2> $null }
+If ( Test-Path -Path $ErrorFile ) { 
+
+	Remove-Item -Force $ErrorFile 2> $null
+}
 
 Write-Host "`n"
 Read-Host -Prompt "Press Enter To Exit"
