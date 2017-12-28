@@ -367,9 +367,17 @@ If ( Test-Path -Path "$ScriptDir\autorunsc.exe" ) {
 	Remove-Item -Force "$ScriptDir\autorunsc.exe"
 }
 
-# Move log into $Path if it is non-empty
 If ( $(Test-Path -Path $Log) -eq "True" -and (Get-Item $Log).Length -gt 0 ) {
 
+	# Allow log file to be modified by standard users, otherwise hashing and compression may fail 
+	$LogACL = Get-ACL -Path $Log
+	$LogACL.SetAccessRuleProtection(1,0)
+	$NewAccessRule= New-Object
+	System.Security.AccessControl.FileSystemAccessRule("everyone","full","none","none","Allow")
+	$LogACL.AddAccessRule($NewAccessRule)
+	Set-Acl -Path $Log -AclObject $LogACL
+
+	# Move log into $Path if it is non-empty
 	Move-Item -Path $Log -Destination $Path
 }
 
