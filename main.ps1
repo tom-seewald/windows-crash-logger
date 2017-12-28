@@ -3,7 +3,7 @@
 ##############################
 
 # Version String
-$ScriptVer = "Beta07 - 12/23/17"
+$ScriptVer = "Beta08 - 12/27/17"
 
 # Detect Windows version, convert the value from a string to a decimal
 $MajorVer=[System.Environment]::OSVersion.Version.Major
