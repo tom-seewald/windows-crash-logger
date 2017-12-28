@@ -55,8 +55,8 @@ Function Compress-Folder {
 
 	Else {
 
-		Write-Output "Could not find $ScriptDir\compression.vbs" >> "$Path\script-log.log"
-		Write-Warning "Could not find compression.vbs"
+		Write-Output "Could not find $CompressionScriptPath" >> "$Path\script-log.log"
+		Write-Warning "Could not find $CompressionScriptPath"
 		Return "False"
 	}
 }
