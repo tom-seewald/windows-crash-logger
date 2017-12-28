@@ -114,7 +114,7 @@ If ( $DefaultPath -eq $MinidumpPath ) {
 
 			Write-Host "No Crash Dumps To Copy From $MinidumpPath"
 
-			Write-Output "No Crash Dumps To Copy From $MinidumpPath." >> "$Path\Crash Dumps\mini-crash-dumps.txt"
+			Write-Output "$MinidumpPath contains no dump files." >> "$Path\Crash Dumps\mini-crash-dumps.txt"
 		}
 	}
 
@@ -144,7 +144,7 @@ Else {
 		Else {
 
 			Write-Host "No Crash Dumps To Copy From $MinidumpPath"
-			Write-Output "No Crash Dumps To Copy From $MinidumpPath." >> "$Path\Crash Dumps\mini-crash-dumps.txt"
+			Write-Output "$MinidumpPath contains no dump files." >> "$Path\Crash Dumps\mini-crash-dumps.txt"
 		}
 	}
 
@@ -168,7 +168,7 @@ Else {
 		Else {
 		
 			Write-Host "No Crash Dumps To Copy From $DefaultPath"
-			Write-Output "No Crash Dumps To Copy From $DefaultPath." >> "$Path\Crash Dumps\mini-crash-dumps.txt"
+			Write-Output "$DefaultPath contains no dump files." >> "$Path\Crash Dumps\mini-crash-dumps.txt"
 		}
 	}
 
