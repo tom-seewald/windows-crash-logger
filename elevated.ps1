@@ -381,4 +381,7 @@ If ( $(Test-Path -Path $Log) -eq "True" -and (Get-Item $Log).Length -gt 0 ) {
 	Move-Item -Path $Log -Destination $Path
 }
 
-If ( Test-Path -Path $ErrorFile ) { Remove-Item -Force $ErrorFile 2> $null }
+If ( Test-Path -Path $ErrorFile ) {
+
+	Remove-Item -Force $ErrorFile 2> $null
+}
