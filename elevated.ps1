@@ -228,7 +228,7 @@ Else {
 If ( $(Test-Path -Path "$env:SystemRoot\LiveKernelReports") -eq $True -and $(Get-ChildItem -Path "$env:SystemRoot\LiveKernelReports" ) -ne $null ) {
 
 	$LengthMB = @{Name="Size (MB)";Expression={[math]::Round($_.Length / 1MB, 2)}}
-	Get-ChildItem -Path "$env:SystemRoot\LiveKernelReports" -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object Name,LastWriteTime,$LengthMB > "$Path\Crash Dumps\live-kernel-reports.txt"
+	Get-ChildItem -Path "$env:SystemRoot\LiveKernelReports" -Recurse -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object Name,LastWriteTime,$LengthMB > "$Path\CrashDumps\live-kernel-reports.txt"
 	Write-Log $ScriptError $Log
 }
 
