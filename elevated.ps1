@@ -228,7 +228,7 @@ Else {
 If ( $(Test-Path -Path "$env:SystemRoot\LiveKernelReports") -eq $True -and $(Get-ChildItem -Path "$env:SystemRoot\LiveKernelReports" ) -ne $null ) {
 
 	$LengthMB = @{Name="Size (MB)";Expression={[math]::Round($_.Length / 1MB, 2)}}
-	Get-ChildItem -Path "$env:SystemRoot\LiveKernelReports" -Recurse -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object Name,LastWriteTime,$LengthMB > "$Path\CrashDumps\live-kernel-reports.txt"
+	Get-ChildItem -Path "$env:SystemRoot\LiveKernelReports" -Recurse -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object Name,LastWriteTime,$LengthMB > "$Path\Crash Dumps\live-kernel-reports.txt"
 	Write-Log $ScriptError $Log
 }
 
@@ -297,57 +297,7 @@ If ( Test-Path -Path "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportArchive" 
 	Write-Log $ScriptError $Log
 }
 
-# Download and run autorunsc.exe
-Write-Host "Downloading autorunsc..."
-$AutorunsUrl = "http://live.sysinternals.com/autorunsc.exe"
-
-If ( $VerNum -ge "6.3" ) {
-
-	Try {
-
-		# This remove the progress bar, which slows the download to a crawl if enabled
-		$ProgressPreference = 'SilentlyContinue'
-		Invoke-WebRequest -Uri $AutorunsUrl -OutFile "$ScriptDir\autorunsc.exe" -TimeoutSec 10 -ErrorAction SilentlyContinue -ErrorVariable ScriptError
-		Write-Log $ScriptError $Log
-	}
-
-	Catch {
-
-		Write-Warning "Failed To Download autorunsc. Skipping..."
-		Write-Log "Failed to download autrunsc." $Log
-		Write-Log $error[0] $Log
-
-		# Cleanup if the download fails
-		If ( Test-Path -Path "$ScriptDir\autorunsc.exe" ) {
-		
-			Remove-Item -Force "$ScriptDir\autorunsc.exe"
-		}
-	}
-}
-
-Else {
-
-	Try {
-
-		$AutorunsUrl = "http://live.sysinternals.com/autorunsc.exe"
-		$WebClient = New-Object System.Net.WebClient
-		$WebClient.DownloadFile($AutorunsUrl,"$ScriptDir\autorunsc.exe")
-	}
-
-	Catch {
-
-		Write-Warning "Failed To Download autorunsc. Skipping..."
-		Write-Log "Failed to download autorunsc." $Log
-		Write-Log $error[0] $Log
-
-		# Cleanup if the download fails
-		If ( Test-Path -Path "$ScriptDir\autorunsc.exe" ) {
-		
-			Remove-Item -Force "$ScriptDir\autorunsc.exe"
-		}
-	}
-}
-
+# Find autostart entries, scheduled tasks etc. with Autorunsc.exe
 If ( Test-Path -Path "$ScriptDir\autorunsc.exe" ) {
 
 	Write-Host "Finding Auto-Start Entries..."
@@ -372,8 +322,7 @@ If ( $(Test-Path -Path $Log) -eq "True" -and (Get-Item $Log).Length -gt 0 ) {
 	# Allow log file to be modified by standard users, otherwise hashing and compression may fail 
 	$LogACL = Get-ACL -Path $Log
 	$LogACL.SetAccessRuleProtection(1,0)
-	$NewAccessRule= New-Object
-	System.Security.AccessControl.FileSystemAccessRule("everyone","full","none","none","Allow")
+	$NewAccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule("everyone","full","none","none","Allow")
 	$LogACL.AddAccessRule($NewAccessRule)
 	Set-Acl -Path $Log -AclObject $LogACL
 

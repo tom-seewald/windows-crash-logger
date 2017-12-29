@@ -87,6 +87,77 @@ End Class
     Add-Type $DiskInfoCode -Language VisualBasic
 }
 
+# Download specified remote file
+Function Get-RemoteFile {
+
+    Param(
+        [parameter(Mandatory=$True,position=0)]
+        [string]
+		$URL,
+		[parameter(Mandatory=$True,position=1)]
+        [string]
+		$FileName,
+        [parameter(Mandatory=$True,position=2)]
+        [string]
+		$OutputPath,
+        [parameter(Mandatory=$True,position=3)]
+        [string]
+		$LogPath
+	)
+
+    $MajorVer=[System.Environment]::OSVersion.Version.Major
+    $MinorVer=[System.Environment]::OSVersion.Version.Minor
+    $KernelVersion = "$MajorVer" + "." + "$MinorVer" -as [decimal]
+
+    Write-Host "Downloading $FileName..."
+
+    If ( $KernelVersion -ge "6.3" ) {
+
+        Try {
+
+            # This remove the progress bar, which slows the download to a crawl if enabled
+            $ProgressPreference = 'SilentlyContinue'
+            Invoke-WebRequest -Uri $URL -OutFile $OutputPath -TimeoutSec 10 -ErrorAction SilentlyContinue -ErrorVariable ScriptError
+            Write-Log $ScriptError $LogPath
+        }
+
+        Catch {
+
+            Write-Warning "Failed To Download $FileName. Skipping..."
+            Write-Log "Failed to download $FileName." $LogPath
+            Write-Log $error[0] $LogPath
+
+            # Cleanup if the download fails
+            If ( Test-Path -Path $OutputPath ) {
+            
+                Remove-Item -Force $OutputPath
+            }
+        }
+    }
+
+    Else {
+
+        Try {
+
+            $WebClient = New-Object System.Net.WebClient
+            $WebClient.DownloadFile($URL,$OutputPath)
+        }
+
+        Catch {
+
+            Write-Warning "Failed To Download $FileName. Skipping..."
+            Write-Log "Failed to download $FileName." $LogPath
+            Write-Log $error[0] $LogPath
+
+            # Cleanup if the download fails
+            If ( Test-Path -Path $OutputPath ) {
+            
+                Remove-Item -Force $OutputPath
+            }
+        }
+    }
+}
+
 # Loop until a process exits for a specified number of seconds, kills the process if the timeout is reached
 Function Wait-Process {
 
@@ -99,7 +170,10 @@ Function Wait-Process {
         [parameter(Mandatory=$True,position=2)]
         [int16]
         $TimeoutSeconds,
-        [parameter(Mandatory=$False,position=3)]
+        [parameter(Mandatory=$True,position=3)]
+        [string]
+		$LogPath,
+		[parameter(Mandatory=$False,position=4)]
         [string]
         $OutputFilePath
 	)
@@ -119,18 +193,18 @@ Function Wait-Process {
 	If ( !$Process.HasExited -and $StartTime.AddSeconds($TimeoutSeconds) -le (Get-Date) ) {
 
 		Stop-Process -Force -Id $Process.Id 2> $ScriptError
-		Write-Log $ScriptError $Log
+		Write-Log $ScriptError $LogPath
 
 		If ( $OutputFilePath -ne $null ) {
 
 			If ( Test-Path -Path $OutputFilePath ) {
 
 				Remove-Item "$OutputFilePath" 2> $ScriptError
-				Write-Log $ScriptError $Log
+				Write-Log $ScriptError $LogPath
 			}
 		}
 
-		Write-Log "Killed $ProcessName due to timeout." $Log
+		Write-Log "Killed $ProcessName due to timeout." $LogPath
 		Write-Warning "Killed $ProcessName due to timeout."
 	}
 }
@@ -172,4 +246,4 @@ Function Write-Log {
 	}
 }
 
-Export-ModuleMember -Function Compress-Folder, Get-DiskInformation, Wait-Process, Write-CommandError, Write-Log 
+Export-ModuleMember -Function Compress-Folder, Get-DiskInformation, Get-RemoteFile, Wait-Process, Write-CommandError, Write-Log 

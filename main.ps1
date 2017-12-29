@@ -3,7 +3,7 @@
 ##############################
 
 # Version String
-$ScriptVer = "Beta08 - 12/27/17"
+$ScriptVer = "Beta08 - 12/28/17"
 
 # Detect Windows version, convert the value from a string to a decimal
 $MajorVer=[System.Environment]::OSVersion.Version.Major
@@ -125,6 +125,9 @@ Catch {
     Write-Log "Failed to launch msinfo32.exe!" $Log
     Write-Log $error[0] $Log
 }
+
+# Download autorunsc
+Get-RemoteFile "http://live.sysinternals.com/autorunsc.exe" "autorunsc" "$ScriptDir\autorunsc.exe" $Log
 
 # Start elevated.ps1
 If ( Test-Path -Path "$ScriptDir\elevated.ps1" ) {
@@ -315,19 +318,19 @@ Else {
 # Wait if dxdiag.exe has not finished, kill process if timeout is reached
 If ( $DxDiag -ne $null ) {
 
-	Wait-Process $DxDiag dxdiag.exe 30 "$Path\dxdiag.txt"
+	Wait-Process $DxDiag dxdiag.exe 5 $Log "$Path\dxdiag.txt"
 }
 
 # Wait if msinfo32.exe has not finished, kill process if timeout is reached
 If ( $MsInfo32 -ne $null ) {
 
-	Wait-Process $MsInfo32 msinfo32.exe 120 "$Path\msinfo32.nfo"
+	Wait-Process $MsInfo32 msinfo32.exe 120 $Log "$Path\msinfo32.nfo"
 }
 
 # Wait if elevated.ps1 has not finished, kill the script if timeout is reached
 If ( $ElevatedScript -ne $null ) {
 
-	Wait-Process $ElevatedScript "Elevated Script" 120
+	Wait-Process $ElevatedScript "Elevated Script" 120 $Log
 }
 
 # Move log into $Path if it is non-empty
