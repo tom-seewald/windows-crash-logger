@@ -76,7 +76,7 @@ $VerNum = "$MajorVer" + "." + "$MinorVer" -as [decimal]
 $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size (1000,1000)
 
 # Get crash dump settings and append crash dump type matrix
-Write-Host "Getting Crash Dump Settings..."
+Write-Host "Getting crash dump settings..."
 Write-Output "########################## Crash Dump Settings #########################" > "$Path\Crash Dumps\crash-dump-settings.txt"
 Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl" >> "$Path\Crash Dumps\crash-dump-settings.txt" -ErrorAction SilentlyContinue -ErrorVariable ScriptError
 Write-Log $ScriptError $Log
@@ -104,24 +104,21 @@ If ( $DefaultPath -eq $MinidumpPath ) {
 
 		If ( $(Get-ChildItem -Filter "*.dmp" -Path "$MinidumpPath") -ne $null ) {
 
-			Write-Host "Copying Crash Dumps from $MinidumpPath..."
-
+			Write-Host "Copying crash dumps from $MinidumpPath..."
 			Get-ChildItem -Filter "*.dmp" -Path "$MinidumpPath" | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$Path\Crash Dumps" } -ErrorAction SilentlyContinue -ErrorVariable ScriptError
 			Write-Log $ScriptError $Log
 		}
 
 		Else {
 
-			Write-Host "No Crash Dumps To Copy From $MinidumpPath"
-
+			Write-Host "No crash dumps to copy from $MinidumpPath"
 			Write-Output "$MinidumpPath contains no dump files." >> "$Path\Crash Dumps\mini-crash-dumps.txt"
 		}
 	}
 
 	Else {
 
-		Write-Host "No Crash Dumps To Copy From $MinidumpPath"
-
+		Write-Host "No crash dumps to copy from $MinidumpPath"
 		Write-Output "$MinidumpPath does not exist." >> "$Path\Crash Dumps\mini-crash-dumps.txt"
 	}
 }
@@ -136,21 +133,21 @@ Else {
 
 		If ( $(Get-ChildItem -Filter "*.dmp" -Path "$MinidumpPath") -ne $null ) {
 
-			Write-Host "Copying Crash Dumps from $MinidumpPath..."
+			Write-Host "Copying crash dumps from $MinidumpPath..."
 			Get-ChildItem -Filter "*.dmp" -Path "$MinidumpPath" | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$Path\Crash Dumps" } -ErrorAction SilentlyContinue -ErrorVariable ScriptError
 			Write-Log $ScriptError $Log
 		}
 
 		Else {
 
-			Write-Host "No Crash Dumps To Copy From $MinidumpPath"
+			Write-Host "No crash dumps to copy from $MinidumpPath"
 			Write-Output "$MinidumpPath contains no dump files." >> "$Path\Crash Dumps\mini-crash-dumps.txt"
 		}
 	}
 
 	Else {
 
-		Write-Host "No Crash Dumps To Copy From $MinidumpPath"
+		Write-Host "No crash dumps to copy from $MinidumpPath"
 		Write-Output "$MinidumpPath does not exist." >> "$Path\Crash Dumps\mini-crash-dumps.txt"
 	}
 
@@ -160,21 +157,21 @@ Else {
 
 		If ( $(Get-ChildItem -Filter "*.dmp" -Path "$DefaultPath") -ne $null ) {
 
-			Write-Host "Copying Crash Dumps from $DefaultPath..."
+			Write-Host "Copying crash dumps from $DefaultPath..."
 			Get-ChildItem -Filter "*.dmp" -Path "$DefaultPath"  | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$Path\Crash Dumps" } -ErrorAction SilentlyContinue -ErrorVariable ScriptError
 			Write-Log $ScriptError $Log
 		}
 
 		Else {
 		
-			Write-Host "No Crash Dumps To Copy From $DefaultPath"
+			Write-Host "No crash dumps to copy from $DefaultPath"
 			Write-Output "$DefaultPath contains no dump files." >> "$Path\Crash Dumps\mini-crash-dumps.txt"
 		}
 	}
 
 	Else {
 
-		Write-Host "No Crash Dumps To Copy From $DefaultPath"
+		Write-Host "No crash dumps to copy from $DefaultPath"
 		Write-Output "$DefaultPath does not exist." >> "$Path\Crash Dumps\mini-crash-dumps.txt"
 	}
 }
@@ -235,7 +232,7 @@ If ( $(Test-Path -Path "$env:SystemRoot\LiveKernelReports") -eq $True -and $(Get
 # Gather a System Power Report, only supported on 8.1 and newer
 If ( $VerNum -ge "6.3" ) {
 
-	Write-Host "Running System Power Report..."
+	Write-Host "Running system power report..."
 	&"$env:SystemRoot\System32\powercfg.exe" /sleepstudy /output "$Path\power-report.html" > $null 2> $ErrorFile
 	Write-CommandError $ErrorFile $Log
 }
@@ -252,21 +249,21 @@ If ( $VerNum -eq "6.3" ) {
 }
 
 # List PnP devices and associated information
-Write-Host "Listing PnP Devices..."
+Write-Host "Listing PnP devices..."
 
 $DriverAttributes = "Name", "Status", "ConfigManagerErrorCode", "Description", "Manufacturer", "DeviceID"
 Get-WmiObject Win32_PNPEntity -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $DriverAttributes | Sort-Object Name | Format-Table -AutoSize >> "$Path\pnp-devices.txt"
 Write-Log $ScriptError $Log
 
 # List all processes
-Write-Host "Enumerating Running Processes..."
+Write-Host "Enumerating running processes..."
 
 $ProcessAttributes = "ProcessName", "ProcessID", "SessionId", "Priority", "CommandLine"
 Get-WmiObject Win32_Process -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $ProcessAttributes | Sort-Object ProcessName,ProcessId | Format-Table -AutoSize > "$Path\processes.txt"
 Write-Log $ScriptError $Log
 
 # List all services including status, pid, only Windows 10 has support for listing service StartType via Get-Service
-Write-Host "Identifying Running Services..."
+Write-Host "Identifying running services..."
 
 If ( $VerNum -ge "10.0" ) {
 
@@ -283,7 +280,7 @@ Else {
 }
 
 # Copy Windows Error Reports
-Write-Host "Copying Windows Error Reports..."
+Write-Host "Copying Windows error reports..."
 
 If ( Test-Path -Path "$home\AppData\Local\Microsoft\Windows\WER\ReportArchive" ) {
 
@@ -300,7 +297,7 @@ If ( Test-Path -Path "$env:ALLUSERSPROFILE\Microsoft\Windows\WER\ReportArchive" 
 # Find autostart entries, scheduled tasks etc. with Autorunsc.exe
 If ( Test-Path -Path "$ScriptDir\autorunsc.exe" ) {
 
-	Write-Host "Finding Auto-Start Entries..."
+	Write-Host "Finding auto-start entries..."
 
 	# -s -m List all autostart entries that are not cryptographically signed by Microsoft, -a = specify autostart selection, b = boot execute, d = Appinit DLLs, w = winlogon, h = image hijacks, e = explorer add-ons, l = logon, t = scheduled tasks
 	Start-Process -FilePath "$ScriptDir\autorunsc.exe" -ArgumentList "-accepteula","-nobanner","-s","-m","-a","bdwhelt" -NoNewWindow -Wait -RedirectStandardOutput "$Path\autorun.txt" -RedirectStandardError $ErrorFile

@@ -22,7 +22,7 @@ Function Compress-Folder {
 
 		Try {
 
-			Write-Host "Compressing Folder..."
+			Write-Host "Compressing folder..."
 			Add-Type -Assembly "system.io.compression.filesystem"
 			[io.compression.zipfile]::CreateFromDirectory("$Inputpath","$OutputPath")
 			$Compression = $?
@@ -46,7 +46,7 @@ Function Compress-Folder {
 	If ( $(Test-Path -Path $CompressionScriptPath) -eq $True -and $Compression -ne "True" ) {
 
 
-		Write-Host "Compressing Folder..."
+		Write-Host "Compressing folder..."
 		&"$env:SystemRoot\System32\cscript.exe" $CompressionScriptPath "$Inputpath" "$OutputPath" > $null 2> $ErrorFile
 		$Result = $?
 		Write-CommandError $ErrorFile $Log
@@ -123,7 +123,7 @@ Function Get-RemoteFile {
 
         Catch {
 
-            Write-Warning "Failed To Download $FileName. Skipping..."
+            Write-Warning "Failed to download $FileName. Skipping..."
             Write-Log "Failed to download $FileName." $LogPath
             Write-Log $error[0] $LogPath
 
@@ -182,7 +182,7 @@ Function Wait-Process {
 
 	If ( !$Process.HasExited ) {
 
-		Write-Host "Waiting For $ProcessName To Finish..."
+		Write-Host "Waiting for $ProcessName to finish..."
 	}
 
 	While ( !$Process.HasExited -and $StartTime.AddSeconds($TimeoutSeconds) -gt (Get-Date) ) {

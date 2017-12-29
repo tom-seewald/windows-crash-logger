@@ -51,7 +51,7 @@ Write-Host "
 Write-Host $ScriptVer
 "`n" * 3
 
-Read-Host -Prompt "Press Enter To Continue"
+Read-Host -Prompt "Press Enter to continue"
 Clear-Host
 
 # Set variables for output folders
@@ -100,19 +100,19 @@ $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(1000,1000
 If ( $VerNum -lt 6.1 ) {
 
 	Write-Log "Unsupported version of Windows, kernel version less than 6.1" $Log
-	Write-Warning "Windows Version Is Unsupported!"
+	Write-Warning "Unsupported version of Windows detected!"
 	Write-Warning "This script has not been tested on any release prior to Windows 7!"
 }
 
 If ( $VerNum -eq 6.2 ) {
 
 	Write-Log "Unsupported version of Windows detected, Windows 8" $Log
-	Write-Warning "Windows Version Is Unsupported!"
+	Write-Warning "Unsupported version of Windows detected!"
 	Write-Warning "This script has not been tested on Windows 8, please upgrade!"
 }
 
 # Generate System Information Report
-Write-Host "Generating System Information Report, this may take a while..."
+Write-Host "Generating system information report, this may take a while..."
 
 Try {
 
@@ -121,7 +121,7 @@ Try {
 
 Catch {
 
-    Write-Warning "Failed To Launch msinfo32.exe!"
+    Write-Warning "Failed to launch msinfo32.exe!"
     Write-Log "Failed to launch msinfo32.exe!" $Log
     Write-Log $error[0] $Log
 }
@@ -132,7 +132,7 @@ Get-RemoteFile "http://live.sysinternals.com/autorunsc.exe" "autorunsc" "$Script
 # Start elevated.ps1
 If ( Test-Path -Path "$ScriptDir\elevated.ps1" ) {
 
-	Write-Host "Launching Elevated Script..."
+	Write-Host "Launching elevated script..."
 
 	Try {
 	
@@ -143,8 +143,8 @@ If ( Test-Path -Path "$ScriptDir\elevated.ps1" ) {
 
 	Catch {
 
-		Write-Warning "Failed To Launch Elevated Script!" 
-        Write-Log "Failed To Launch Elevated Script!" $Log
+		Write-Warning "Failed to launch elevated script!" 
+        Write-Log "Failed to launch elevated script" $Log
         Write-Log $error[0] $Log
 	}
 }
@@ -156,7 +156,7 @@ Else {
 }
 
 # Start DirectX Diagnostics Report
-Write-Host "Running DirectX Diagnostics..."
+Write-Host "Running DirectX diagnostics..."
 
 Try {
 
@@ -165,17 +165,17 @@ Try {
 
 Catch {
 
-	Write-Warning "Failed To Run DirectX Diagnostics!"
+	Write-Warning "Failed to run DirectX diagnostics!"
     Write-Log "Failed to run dxdiag.exe" $Log
     Write-Log $error[0] $Log
 }
 
 # Export Event Logs (2592000000 ms = 30 days)
-Write-Host "Exporting Application Event Log..."
+Write-Host "Exporting Application event Log..."
 &"$env:SystemRoot\System32\wevtutil.exe" query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $Path\Events\application-events.txt
 Write-CommandError $ErrorFile $Log
 
-Write-Host "Exporting System Event Log..."
+Write-Host "Exporting System event log..."
 
 &"$env:SystemRoot\System32\wevtutil.exe" query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $Path\Events\system-events.txt 2> $ErrorFile
 Write-CommandError $ErrorFile $Log
@@ -184,14 +184,14 @@ Write-CommandError $ErrorFile $Log
 # Kernel PnP Event log only exists on Windows 8.1 and newer
 If ( $VerNum -ge "6.3" ) {
 
-	Write-Host "Exporting Kernel PnP Log..."
+	Write-Host "Exporting Kernel PnP log..."
 	&"$env:SystemRoot\System32\wevtutil.exe" query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $Path\Events\pnp-events.txt 2> $ErrorFile
 	Write-CommandError $ErrorFile $Log
 
 }
 
 # Driver information
-Write-Host "Gathering Driver Information..."
+Write-Host "Gathering driver information..."
 &"$env:SystemRoot\System32\driverquery.exe" /v /fo table 2> $ErrorFile | Select-Object -Skip 1 > "$Path\driver-table.txt"
 Write-CommandError $ErrorFile $Log
 
@@ -200,12 +200,12 @@ Get-WmiObject Win32_PnPSignedDriver -ErrorAction SilentlyContinue -ErrorVariable
 Write-Log $ScriptError $Log
 
 # Get Default Power Plan
-Write-Host "Checking Power Settings..."
+Write-Host "Checking power settings..."
 &"$env:SystemRoot\System32\powercfg.exe" /list > "$Path\power-plan.txt" 2> $ErrorFile
 Write-CommandError $ErrorFile $Log
 
 # RAM info
-Write-Host "Getting Hardware Information..."
+Write-Host "Getting hardware information..."
 $MemoryAttributes = "BankLabel", "DeviceLocator", "Manufacturer", "Capacity", "ConfiguredClockspeed", "ConfiguredVoltage", "SerialNumber", "PartNumber"
 Get-WmiObject Win32_PhysicalMemory -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $MemoryAttributes | Sort-Object BankLabel, DeviceLocator | Format-List > "$Path\ram.txt"
 Write-Log $ScriptError $Log
@@ -259,12 +259,12 @@ Get-WmiObject Win32_VideoController -ErrorAction SilentlyContinue -ErrorVariable
 Write-Log $ScriptError $Log
 
 # Windows license information
-Write-Host "Finding Windows License Information..."
+Write-Host "Finding Windows license information..."
 &"$env:SystemRoot\System32\cscript.exe" $env:SystemRoot\System32\slmgr.vbs /dlv -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object -Skip 4 > "$Path\windows-license-info.txt"
 Write-Log $ScriptError $Log
 
 # Installed software, first check native and then 32-bit (if it exists).
-Write-Host "Listing Installed Software..."
+Write-Host "Listing installed software..."
 
 $SoftwareAttributes = "DisplayName", "DisplayVersion", "Publisher", "InstallDate"
 Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $SoftwareAttributes | `
@@ -289,12 +289,12 @@ Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\*" 
 Write-Log $ScriptError $Log
 
 # Installed Windows Updates
-Write-Host "Listing Installed Windows Updates..."
+Write-Host "Listing installed Windows updates..."
 Get-WmiObject Win32_QuickFixEngineering -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object HotFixID,Description,InstalledOn | Sort-Object InstalledOn,HotFixID | Format-Table -AutoSize > "$Path\windows-updates.txt"
 Write-Log $ScriptError $Log
 
 # Basic networking information
-Write-Host "Finding Network Information..."
+Write-Host "Finding network information..."
 &"$env:SystemRoot\System32\ipconfig.exe" /allcompartments /all 2> $ErrorFile | Select-Object -Skip 1 > "$Path\network-info.txt"
 Write-CommandError $ErrorFile $Log
 
@@ -302,7 +302,7 @@ Write-CommandError $ErrorFile $Log
 Write-CommandError $ErrorFile $Log
 
 # Copy relevant entries from the hosts file
-Write-Host "Examining Hosts File..."
+Write-Host "Examining hosts file..."
 
 If ( Test-Path -Path "$env:SystemRoot\System32\drivers\etc\hosts" ) {
 
@@ -330,7 +330,7 @@ If ( $MsInfo32 -ne $null ) {
 # Wait if elevated.ps1 has not finished, kill the script if timeout is reached
 If ( $ElevatedScript -ne $null ) {
 
-	Wait-Process $ElevatedScript "Elevated Script" 120 $Log
+	Wait-Process $ElevatedScript "elevated script" 120 $Log
 }
 
 # Move log into $Path if it is non-empty
@@ -366,7 +366,7 @@ If ( $(Test-Path -Path $Zip) -eq "True" -and $CompressionResult -eq "True" ) {
 
 Else {
 
-    Write-Host "Compression Failed!"
+    Write-Host "Compression failed!"
     Write-Host "`n"
     Write-Host "Output location: $Path"
 }
@@ -377,4 +377,4 @@ If ( Test-Path -Path $ErrorFile ) {
 }
 
 Write-Host "`n"
-Read-Host -Prompt "Press Enter To Exit"
+Read-Host -Prompt "Press Enter to exit"
