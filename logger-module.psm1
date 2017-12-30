@@ -107,11 +107,11 @@ Function Get-RemoteFile {
 
     $MajorVer=[System.Environment]::OSVersion.Version.Major
     $MinorVer=[System.Environment]::OSVersion.Version.Minor
-    $KernelVersion = "$MajorVer" + "." + "$MinorVer" -as [decimal]
+    $WindowsVersion = "$MajorVer" + "." + "$MinorVer" -as [decimal]
 
     Write-Host "Downloading $FileName..."
 
-    If ( $KernelVersion -ge "6.3" ) {
+    If ( $WindowsVersion -ge "6.3" ) {
 
         Try {
 
@@ -234,6 +234,7 @@ Function Write-Log {
         [string]
 		$Message,
 		[parameter(Mandatory=$True,position=1)]
+		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
         [string]
 		$LogPath
 	)

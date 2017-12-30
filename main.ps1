@@ -3,15 +3,15 @@
 ##############################
 
 # Version String
-$ScriptVer = "Beta08 - 12/28/17"
+$ScriptVer = "Beta08 - 12/29/17"
 
 # Detect Windows version, convert the value from a string to a decimal
 $MajorVer=[System.Environment]::OSVersion.Version.Major
 $MinorVer=[System.Environment]::OSVersion.Version.Minor
-$VerNum = "$MajorVer" + "." + "$MinorVer" -as [decimal]
+$WindowsVersion= "$MajorVer" + "." + "$MinorVer" -as [decimal]
 
 # Abort if Controlled Folder Access is enabled, as it prevents log files from being placed on the desktop
-If ( $VerNum -ge 10 ) {
+If ( $WindowsVersion-ge 10 ) {
 
 	If ( (Get-MpPreference).EnableControlledFolderAccess -eq 1 ) {
 
@@ -97,14 +97,14 @@ Catch {
 $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(1000,1000)
 
 # Check that the OS is supported
-If ( $VerNum -lt 6.1 ) {
+If ( $WindowsVersion-lt 6.1 ) {
 
 	Write-Log "Unsupported version of Windows, kernel version less than 6.1" $Log
 	Write-Warning "Unsupported version of Windows detected!"
 	Write-Warning "This script has not been tested on any release prior to Windows 7!"
 }
 
-If ( $VerNum -eq 6.2 ) {
+If ( $WindowsVersion-eq 6.2 ) {
 
 	Write-Log "Unsupported version of Windows detected, Windows 8" $Log
 	Write-Warning "Unsupported version of Windows detected!"
@@ -127,7 +127,7 @@ Catch {
 }
 
 # Download autorunsc
-Get-RemoteFile "http://live.sysinternals.com/autorunsc.exe" "autorunsc" "$ScriptDir\autorunsc.exe" $Log
+Get-RemoteFile "https://live.sysinternals.com/autorunsc.exe" "autorunsc" "$ScriptDir\autorunsc.exe" $Log
 
 # Start elevated.ps1
 If ( Test-Path -Path "$ScriptDir\elevated.ps1" ) {
@@ -182,7 +182,7 @@ Write-CommandError $ErrorFile $Log
 
 
 # Kernel PnP Event log only exists on Windows 8.1 and newer
-If ( $VerNum -ge "6.3" ) {
+If ( $WindowsVersion-ge "6.3" ) {
 
 	Write-Host "Exporting Kernel PnP log..."
 	&"$env:SystemRoot\System32\wevtutil.exe" query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $Path\Events\pnp-events.txt 2> $ErrorFile
@@ -227,7 +227,7 @@ $DevicePath = @{Name="Device Path";Expression={[diskinfo]::GetDeviceName($_.Driv
 Get-WmiObject Win32_Volume -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Where-Object { $_.DriveLetter -ne $null } | Select-Object DriveLetter, $SizeGB, $FreeGB, $DevicePath | Sort-Object DriveLetter | Format-Table -AutoSize > "$Path\partitions.txt"
 Write-Log $ScriptError $Log
 
-If ( $VerNum -ge "10.0" ) {
+If ( $WindowsVersion-ge "10.0" ) {
 
 	Get-Partition -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Format-List >> "$Path\partitions.txt"
 	Write-Log $ScriptError $Log
@@ -342,7 +342,7 @@ If ( $(Test-Path -Path $Log) -eq "True" -and (Get-Item $Log).Length -gt 0 ) {
 # Get hash of files to later check for corruption
 $FileName = @{Name="FileName";Expression={Split-Path $_.Path -Leaf}}
 
-If ( $VerNum -ge "6.3" ) {
+If ( $WindowsVersion-ge "6.3" ) {
 
     Get-ChildItem -Path "$Path" -Recurse -Exclude "*.wer" | Get-FileHash -Algorithm SHA256 | Select-Object $FileName, Hash, Algorithm | Sort-Object FileName | Format-Table -AutoSize > "$env:LOCALAPPDATA\hashes.txt"
 }
