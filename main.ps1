@@ -172,7 +172,7 @@ Catch {
 
 # Export Event Logs (2592000000 ms = 30 days)
 Write-Host "Exporting Application event Log..."
-&"$env:SystemRoot\System32\wevtutil.exe" query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $Path\Events\application-events.txt
+&"$env:SystemRoot\System32\wevtutil.exe" query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $Path\Events\application-events.txt 2> $ErrorFile
 Write-CommandError $ErrorFile $Log
 
 Write-Host "Exporting System event log..."
