@@ -45,7 +45,6 @@ Function Compress-Folder {
 
 	If ( $(Test-Path -Path $CompressionScriptPath) -eq $True -and $Compression -ne "True" ) {
 
-
 		Write-Host "Compressing folder..."
 		&"$env:SystemRoot\System32\cscript.exe" $CompressionScriptPath "$Inputpath" "$OutputPath" > $null 2> $ErrorFile
 		$Result = $?
