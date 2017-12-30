@@ -176,10 +176,8 @@ Write-Host "Exporting Application event Log..."
 Write-CommandError $ErrorFile $Log
 
 Write-Host "Exporting System event log..."
-
 &"$env:SystemRoot\System32\wevtutil.exe" query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text > $Path\Events\system-events.txt 2> $ErrorFile
 Write-CommandError $ErrorFile $Log
-
 
 # Kernel PnP Event log only exists on Windows 8.1 and newer
 If ( $WindowsVersion-ge "6.3" ) {
