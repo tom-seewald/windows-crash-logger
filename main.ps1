@@ -321,7 +321,7 @@ If ( $DxDiag -ne $null ) {
 # Wait if msinfo32.exe has not finished, kill process if timeout is reached
 If ( $MsInfo32 -ne $null ) {
 
-	Wait-Process -ProcessObject $MsInfo32 -ProcessName "msinfo32.exe" -TimeoutSeconds 120 -LogPath $Log -OutputFilePath "$Path\msinfo32.nfo"
+	Wait-Process -ProcessObject $MsInfo32 -ProcessName "msinfo32.exe" -TimeoutSeconds 300 -LogPath $Log -OutputFilePath "$Path\msinfo32.nfo"
 }
 
 # Wait if elevated.ps1 has not finished, kill the script if timeout is reached
