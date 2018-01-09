@@ -315,7 +315,7 @@ Else {
 # Wait if dxdiag.exe has not finished, kill process if timeout is reached
 If ( $DxDiag -ne $null ) {
 
-	Wait-Process -ProcessObject $DxDiag -ProcessName "dxdiag.exe" -TimeoutSeconds 5 -LogPath $Log -OutputFilePath "$Path\dxdiag.txt"
+	Wait-Process -ProcessObject $DxDiag -ProcessName "dxdiag.exe" -TimeoutSeconds 10 -LogPath $Log -OutputFilePath "$Path\dxdiag.txt"
 }
 
 # Wait if msinfo32.exe has not finished, kill process if timeout is reached
