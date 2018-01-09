@@ -54,7 +54,7 @@ Try {
 
 		Write-Warning "Invalid path specified!"
 		Write-Warning "Aborting script!"
-		Write-Log -Message "Path is invalid. Script aborted! Path variable is $Path"-LogPath $Log
+		Write-Log -Message "Path is invalid. Script aborted! Path variable is $Path" -LogPath $Log
 		Exit
 	}
 }
@@ -63,7 +63,7 @@ Catch {
 
 	Write-Warning "Invalid path specified!"
 	Write-Warning "Aborting script!"
-	Write-Log -Message "Path is invalid. Script aborted! Path variable is $Path"-LogPath $Log
+	Write-Log -Message "Path is invalid. Script aborted! Path variable is $Path" -LogPath $Log
 	Exit
 }
 
@@ -306,7 +306,7 @@ If ( Test-Path -Path "$ScriptPath\autorunsc.exe" ) {
 
 Else {
 
-	Write-Log "$ScriptPath\autorunsc.exe not found."-LogPath $Log
+	Write-Log "$ScriptPath\autorunsc.exe not found." -LogPath $Log
 }
 
 If ( Test-Path -Path "$ScriptPath\autorunsc.exe" ) {
