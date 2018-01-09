@@ -172,7 +172,7 @@ Function Wait-Process {
 		[string]
         $ProcessName,
         [parameter(Mandatory=$True)]
-        [int16]
+        [int]
         $TimeoutSeconds,
         [parameter(Mandatory=$True)]
 		[string]
@@ -210,7 +210,7 @@ Function Wait-Process {
 			}
 		}
 
-		Write-Log -Message "Killed $ProcessName due to timeout." -LogPath $LogPath
+		Write-Log -Message "Killed $ProcessName due to $TimeoutSeconds second timeout." -LogPath $LogPath
 		Write-Warning "Killed $ProcessName due to timeout."
 	}
 }
