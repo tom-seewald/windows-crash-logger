@@ -2,18 +2,21 @@
 Function Compress-Folder {
 
     Param(
-		[parameter(Mandatory=$True,position=0)]
+		[parameter(Mandatory=$True)]
 		[string]
+		[ValidateScript({ Test-Path -Path $_ })]
 		$InputPath,
-		[parameter(Mandatory=$True,position=1)]
+		[parameter(Mandatory=$True)]
 		[string]
+		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
 		$OutputPath,
-		[parameter(Mandatory=$True,position=2)]
+		[parameter(Mandatory=$False)]
 		[string]
 		$CompressionScriptPath,
-		[parameter(Mandatory=$True,position=3)]
+		[parameter(Mandatory=$True)]
+		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
 		[string]
-		$Log
+		$LogPath
     )
 
 	$ErrorFile = $ErrorFile = "$env:TEMP\error-temp.txt"
@@ -46,9 +49,9 @@ Function Compress-Folder {
 	If ( $(Test-Path -Path $CompressionScriptPath) -eq $True -and $Compression -ne "True" ) {
 
 		Write-Host "Compressing folder..."
-		&"$env:SystemRoot\System32\cscript.exe" $CompressionScriptPath "$Inputpath" "$OutputPath" > $null 2> $ErrorFile
+		&"$env:SystemRoot\System32\cscript.exe" $CompressionScriptPath "$InputPath" "$OutputPath" > $null 2> $ErrorFile
 		$Result = $?
-		Write-CommandError $ErrorFile $Log
+		Write-CommandError $ErrorFile $LogPath
 		Return $Result
 	}
 
@@ -90,16 +93,18 @@ End Class
 Function Get-RemoteFile {
 
     Param(
-        [parameter(Mandatory=$True,position=0)]
+        [parameter(Mandatory=$True)]
         [string]
 		$URL,
-		[parameter(Mandatory=$True,position=1)]
+		[parameter(Mandatory=$True)]
         [string]
 		$FileName,
-        [parameter(Mandatory=$True,position=2)]
+		[parameter(Mandatory=$True)]
+		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
         [string]
 		$OutputPath,
-        [parameter(Mandatory=$True,position=3)]
+		[parameter(Mandatory=$True)]
+		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
         [string]
 		$LogPath
 	)
@@ -161,38 +166,40 @@ Function Get-RemoteFile {
 Function Wait-Process {
 
     Param(
-		[parameter(Mandatory=$True,position=0)]
-		$Process,
-		[parameter(Mandatory=$True,position=1)]
+		[parameter(Mandatory=$True)]
+		$ProcessObject,
+		[parameter(Mandatory=$True)]
 		[string]
         $ProcessName,
-        [parameter(Mandatory=$True,position=2)]
+        [parameter(Mandatory=$True)]
         [int16]
         $TimeoutSeconds,
-        [parameter(Mandatory=$True,position=3)]
-        [string]
+        [parameter(Mandatory=$True)]
+		[string]
+		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
 		$LogPath,
-		[parameter(Mandatory=$False,position=4)]
-        [string]
+		[parameter(Mandatory=$False)]
+		[string]
+		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
         $OutputFilePath
 	)
 
 	$StartTime = Get-Date
 
-	If ( !$Process.HasExited ) {
+	If ( !$ProcessObject.HasExited ) {
 
 		Write-Host "Waiting for $ProcessName to finish..."
 	}
 
-	While ( !$Process.HasExited -and $StartTime.AddSeconds($TimeoutSeconds) -gt (Get-Date) ) {
+	While ( !$ProcessObject.HasExited -and $StartTime.AddSeconds($TimeoutSeconds) -gt (Get-Date) ) {
 
 		Start-Sleep -Milliseconds 500
 	}
 
-	If ( !$Process.HasExited -and $StartTime.AddSeconds($TimeoutSeconds) -le (Get-Date) ) {
+	If ( !$ProcessObject.HasExited -and $StartTime.AddSeconds($TimeoutSeconds) -le (Get-Date) ) {
 
-		Stop-Process -Force -Id $Process.Id 2> $ScriptError
-		Write-Log $ScriptError $LogPath
+		Stop-Process -Force -Id $ProcessObject.Id 2> $ScriptError
+		Write-Log -Message $ScriptError -LogPath $LogPath
 
 		If ( $OutputFilePath -ne $null ) {
 
@@ -203,7 +210,7 @@ Function Wait-Process {
 			}
 		}
 
-		Write-Log "Killed $ProcessName due to timeout." $LogPath
+		Write-Log -Message "Killed $ProcessName due to timeout." -LogPath $LogPath
 		Write-Warning "Killed $ProcessName due to timeout."
 	}
 }
@@ -212,27 +219,29 @@ Function Wait-Process {
 Function Write-CommandError {
 
 	Param(
-        [parameter(Mandatory=$True,position=0)]
+		[parameter(Mandatory=$True)]
+		[ValidateScript({ Test-Path -Path $_ })]
         [string]
 		$ErrorFile,
-		[parameter(Mandatory=$True,position=1)]
+		[parameter(Mandatory=$True)]
+		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
         [string]
 		$LogPath
 	)
 
-	[string]$ErrorMessage = Get-Content -Path $ErrorFile
+	[string]$Message = Get-Content -Path $ErrorFile
 	Set-Content -Path $ErrorFile $null
-	Write-Log $ErrorMessage $LogPath
+	Write-Log -Message $Message -LogPath $LogPath
 }
 
 # Send specified message along with a timestamp to a specified .csv file
 Function Write-Log {
 
     Param(
-        [parameter(Mandatory=$False,position=0)]
+        [parameter(Mandatory=$False)]
         [string]
 		$Message,
-		[parameter(Mandatory=$True,position=1)]
+		[parameter(Mandatory=$True)]
 		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
         [string]
 		$LogPath
