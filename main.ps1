@@ -3,7 +3,7 @@
 ##############################
 
 # Version String
-$ScriptVersion = "Beta08 - 1/8/18"
+$ScriptVersion = "Beta08 - 3/16/18"
 
 # Detect Windows version, convert the value from a string to a decimal
 $MajorVer=[System.Environment]::OSVersion.Version.Major
@@ -240,12 +240,13 @@ If ( $WindowsVersion-ge "10.0" ) {
 }
 
 # System Board information
-$BaseBoarAttributes = "Product", "Model", "Version", "Manufacturer", "Description"
-Get-WmiObject Win32_BaseBoard -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $BaseBoarAttributes | Format-List > "$Path\motherboard.txt"
+$BaseBoardAttributes = "Product", "Model", "Version", "Manufacturer", "Description"
+Get-WmiObject Win32_BaseBoard -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $BaseBoardAttributes | Format-List > "$Path\motherboard.txt"
 Write-Log -Message $ScriptError -LogPath $Log
 
+# UEFI/BIOS properties
 $BiosAttributes = "SMBIOSBIOSVersion", "Manufacturer", "Name", "Version", "BIOSVersion", "ReleaseDate"
-Get-WmiObject Win32_Bios -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $BiosAttributes | Format-List >> "$Path\motherboard.txt"
+Get-WmiObject Win32_Bios -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $BiosAttributes | Format-List >> "$Path\BIOS.txt"
 Write-Log -Message $ScriptError -LogPath $Log
 
 # GPU information
