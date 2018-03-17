@@ -49,7 +49,7 @@ Function Compress-Folder {
 	If ( $(Test-Path -Path $CompressionScriptPath) -eq $True -and $Compression -ne "True" ) {
 
 		Write-Host "Compressing folder..."
-		&"$env:SystemRoot\System32\cscript.exe" $CompressionScriptPath "$InputPath" "$OutputPath" > $null 2> $ErrorFile
+		&"$env:SystemRoot\System32\cscript.exe" $CompressionScriptPath "$InputPath" "$OutputPath" 2> $ErrorFile | Out-Null
 		$Result = $?
 		Write-CommandError $ErrorFile $LogPath
 		Return $Result
@@ -255,4 +255,4 @@ Function Write-Log {
 	}
 }
 
-Export-ModuleMember -Function Compress-Folder, Get-DiskInformation, Get-RemoteFile, Wait-Process, Write-CommandError, Write-Log 
+Export-ModuleMember -Function Compress-Folder, Get-DiskInformation, Get-RemoteFile, Wait-Process, Write-CommandError, Write-Log
