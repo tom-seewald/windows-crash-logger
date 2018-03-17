@@ -4,7 +4,6 @@
 
 Param(
 	[Parameter(Mandatory=$True)]
-	[ValidateScript({ Test-Path -Path $_ })]
 	[string]
 	$Path
 )
@@ -45,6 +44,26 @@ If ( $ElevatedCheck -ne "True" ) {
 	Write-Warning "ERROR: Administrator rights are required for this script to work properly!"
 	Write-Warning "Aborting script!"
 	Write-Log -Message "Administrator rights are required for this script to work properly, exiting script." $Log
+	Exit
+}
+
+# Verify path is valid before continuing
+Try {
+
+	If ( !(Test-Path -Path $Path) ) {
+
+		Write-Warning "Invalid path specified!"
+		Write-Warning "Aborting script!"
+		Write-Log -Message "Path is invalid. Script aborted! Path variable is $Path" -LogPath $Log
+		Exit
+	}
+}
+
+Catch {
+
+	Write-Warning "Invalid path specified!"
+	Write-Warning "Aborting script!"
+	Write-Log -Message "Path is invalid. Script aborted! Path variable is $Path" -LogPath $Log
 	Exit
 }
 
