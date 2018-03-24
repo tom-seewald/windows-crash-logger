@@ -3,7 +3,7 @@
 ##############################
 
 # Version String
-$ScriptVersion = "Beta09 - 3/17/18"
+$ScriptVersion = "Beta10 - 3/24/18"
 
 # Detect Windows version, convert the value from a string to a decimal
 $MajorVer = [System.Environment]::OSVersion.Version.Major
@@ -61,8 +61,8 @@ $ScriptPath = Split-Path $MyInvocation.MyCommand.Path -Parent
 $Time = (Get-Date).ToString("yyyy-MM-dd HH mm")
 $Name = "$env:computername ($Time)"
 $Path = Join-Path -Path "$home\Desktop" -ChildPath $Name
-$Log = Join-Path -Path "$env:TEMP" -ChildPath "script-log.csv"
-$ErrorFile = Join-Path -Path "$env:TEMP" -ChildPath "error-temp.txt"
+$Log = Join-Path -Path $env:TEMP -ChildPath "script-log.csv"
+$ErrorFile = Join-Path -Path $env:TEMP -ChildPath "error-temp.txt"
 $EventLogs = Join-Path -Path $Path -ChildPath "Event Logs"
 $PowerReports = Join-Path -Path $Path -ChildPath "Power Reports"
 $LoggerModule = Join-Path -Path $ScriptPath -ChildPath "logger-module.psm1"
@@ -70,15 +70,15 @@ $ElevatedScriptPath = Join-Path -Path $ScriptPath -ChildPath "elevated.ps1"
 $Zip = "$Path" + ".zip"
 
 # Check for pre-existing files and folders, and remove them if they exist
-If ( Test-Path -Path $Path ) { Remove-Item -Recurse -Force $Path }
-If ( Test-Path -Path $Zip ) { Remove-Item -Force $Zip }
-If ( Test-Path -Path $Log ) { Remove-Item -Force $Log }
-If ( Test-Path -Path $ErrorFile ) { Remove-Item -Force $ErrorFile }
+If ( Test-Path -Path $Path ) { Remove-Item -Path $Path -Recurse -Force }
+If ( Test-Path -Path $Zip ) { Remove-Item -Path $Zip -Force }
+If ( Test-Path -Path $Log ) { Remove-Item -Path $Log -Force }
+If ( Test-Path -Path $ErrorFile ) { Remove-Item -Path $ErrorFile -Force }
 
 # Create directories and files
-New-Item -ItemType Directory $Path -Force -ErrorAction Stop | Out-Null
-New-Item -ItemType Directory $EventLogs -Force -ErrorAction Stop | Out-Null
-New-Item -ItemType Directory $PowerReports -Force -ErrorAction Stop | Out-Null
+New-Item -ItemType Directory -Path $Path -Force -ErrorAction Stop | Out-Null
+New-Item -ItemType Directory -Path $EventLogs -Force -ErrorAction Stop | Out-Null
+New-Item -ItemType Directory -Path $PowerReports -Force -ErrorAction Stop | Out-Null
 New-Item -ItemType File -Path $ErrorFile -Force -ErrorAction Stop | Out-Null
 
 # Import custom module containing support functions
@@ -142,7 +142,8 @@ If ( Test-Path -Path $ElevatedScriptPath ) {
 	
 		$ElevatedScript = Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
 										-ArgumentList """-ExecutionPolicy"" ""Bypass"" ""-NonInteractive"" ""-NoProfile"" ""-File"" ""$ElevatedScriptPath"" ""$Path""" `
-										-Verb RunAs -PassThru
+										-Verb RunAs `
+										-PassThru
 	}
 
 	Catch {
@@ -200,9 +201,9 @@ $DriverInfoAttributes = "DeviceName", "FriendlyName", "InfName", "DriverVersion"
 Get-WmiObject Win32_PnPSignedDriver -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object -Property $DriverInfoAttributes | Where-Object {$_.DeviceName -ne $null -or $_.FriendlyName -ne $null -or $_.InfName -ne $null } | Sort-Object DeviceName | Format-Table -AutoSize | Out-File -FilePath "$Path\driver-versions.txt"
 Write-Log -Message $ScriptError -LogPath $Log
 
-# Get Default Power Plan
+# Get default power plan
 Write-Host "Checking power settings..."
-&"$env:SystemRoot\System32\powercfg.exe" /list | Out-File -FilePath "$PowerReports\power-plan.txt" 2> $ErrorFile
+&"$env:SystemRoot\System32\powercfg.exe" /list 2> $ErrorFile | Out-File -FilePath "$PowerReports\power-plan.txt"
 Write-CommandError -ErrorFile $ErrorFile -LogPath $Log
 
 # RAM info
@@ -260,23 +261,32 @@ $GpuAttributes = "Name", "DeviceID", "PNPDeviceID", "VideoProcessor", "CurrentRe
 Get-WmiObject Win32_VideoController -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $GpuAttributes | Format-List | Out-File -FilePath "$Path\gpu.txt"
 Write-Log -Message $ScriptError -LogPath $Log
 
-# Windows license information
-Write-Host "Finding Windows license information..."
-&"$env:SystemRoot\System32\cscript.exe" $env:SystemRoot\System32\slmgr.vbs /dlv -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object -Skip 4 | Out-File -FilePath "$Path\windows-license-info.txt"
-Write-Log -Message $ScriptError -LogPath $Log
+# Windows license information, redact the license key, and export from xml to flat text
+Write-Host "Creating Windows license report..."
+$LicenseFile = "$env:TEMP\genuine.xml"
+&"$env:SystemRoot\System32\licensingdiag.exe" /report $LicenseFile 2> $ErrorFile | Out-Null
+Write-CommandError -ErrorFile $ErrorFile -LogPath $Log
+[xml] $LicenseXML = Get-Content -Path $LicenseFile
+
+Remove-Item -Path $LicenseFile -Force | Out-Null
+Remove-Item -Path "$env:temp\$env:computername*.cab" -Force | Out-Null
+
+$LicenseXML.DiagReport.LicensingData.OA3ProductKey = "Redacated"
+$LicenseXML.DiagReport.GenuineAuthz.ServerProps = "Redacted"
+$LicenseXML.DiagReport.ChildNodes | Out-File -FilePath "$path\genuine.txt"
 
 # Installed software, first check native and then 32-bit (if it exists).
 Write-Host "Listing installed software..."
 
 $SoftwareAttributes = "DisplayName", "DisplayVersion", "Publisher", "InstallDate"
 Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $SoftwareAttributes | `
-Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | `
+Where-Object { $_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null } | `
 Sort-Object DisplayName | Format-Table -AutoSize | Out-File -FilePath "$Path\installed-software.txt"
 Write-Log -Message $ScriptError -LogPath $Log
 
 If ( Test-Path -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall" ) {
 
-	Write-Output "32-bit Software" >> "$Path\installed-software.txt"
+	Write-Output "32-bit Software" | Out-File -Append -FilePath "$Path\installed-software.txt"
 
 	Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $SoftwareAttributes | Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | Sort-Object DisplayName | Format-Table -AutoSize | Format-Table -AutoSize | Out-File -Append -FilePath "$Path\installed-software.txt"
 	Write-Log -Message $ScriptError -LogPath $Log
@@ -335,7 +345,7 @@ If ( $ElevatedScript -ne $null ) {
 	Wait-Process -ProcessObject $ElevatedScript -ProcessName "elevated script" -TimeoutSeconds 120 -LogPath $Log
 }
 
-# Move log into $Path if it is non-empty
+# Move log into $Path if it is not empty
 If ( $(Test-Path -Path $Log) -eq "True" -and (Get-Item $Log).Length -gt 0 ) {
 
     Move-Item -Path $Log -Destination $Path
@@ -346,7 +356,7 @@ $FileName = @{Name="FileName";Expression={Split-Path $_.Path -Leaf}}
 
 If ( $WindowsVersion -ge "6.3" ) {
 
-    Get-ChildItem -Path "$Path" -Recurse -Exclude "*.wer" | Get-FileHash -Algorithm SHA256 | Select-Object $FileName, Hash, Algorithm | Sort-Object FileName | Format-Table -AutoSize | Out-File -FilePath "$env:LOCALAPPDATA\hashes.txt"
+    Get-ChildItem -Path $Path -Recurse -Exclude "*.wer" | Get-FileHash -Algorithm SHA256 | Select-Object $FileName, Hash, Algorithm | Sort-Object FileName | Format-Table -AutoSize | Out-File -FilePath "$env:LOCALAPPDATA\hashes.txt"
 }
 
 If ( Test-Path -Path "$env:LOCALAPPDATA\hashes.txt" ) {
@@ -362,7 +372,7 @@ Write-Host "`n"
 
 If ( $(Test-Path -Path $Zip) -eq "True" -and $CompressionResult -eq "True" ) {
 
-    Remove-Item -Recurse -Force "$Path"
+    Remove-Item -Path $Path -Recurse -Force | Out-Null
     Write-Host "Output location: $Zip" 
 }
 
@@ -375,7 +385,7 @@ Else {
 
 If ( Test-Path -Path $ErrorFile ) { 
 
-	Remove-Item -Force $ErrorFile 2> $null
+	Remove-Item -Path $ErrorFile -Force | Out-Null
 }
 
 Write-Host "`n"
