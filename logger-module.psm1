@@ -19,7 +19,7 @@ Function Compress-Folder {
 		$LogPath
     )
 
-	$ErrorFile = $ErrorFile = "$env:TEMP\error-temp.txt"
+	$ErrorFile = "$env:TEMP\error-temp-compression.txt"
 
 	If ( $PSVersionTable.PSVersion.Major -ge "3" -and $PSVersionTable.CLRVersion.Major -ge "4" ) {
 
@@ -38,7 +38,7 @@ Function Compress-Folder {
 
 			If ( Test-Path -Path $OutputPath ) {
 			
-				Remove-Item $OutputPath
+				Remove-Item -Path $OutputPath -Force | Out-Null
 			}
 			
 			$Compression = "False"
@@ -49,7 +49,7 @@ Function Compress-Folder {
 	If ( $(Test-Path -Path $CompressionScriptPath) -eq $True -and $Compression -ne "True" ) {
 
 		Write-Host "Compressing folder..."
-		&"$env:SystemRoot\System32\cscript.exe" $CompressionScriptPath "$InputPath" "$OutputPath" 2> $ErrorFile | Out-Null
+		&"$env:SystemRoot\System32\cscript.exe" $CompressionScriptPath $InputPath $OutputPath 2> $ErrorFile | Out-Null
 		$Result = $?
 		Write-CommandError $ErrorFile $LogPath
 		Return $Result
@@ -134,7 +134,7 @@ Function Get-RemoteFile {
             # Cleanup if the download fails
             If ( Test-Path -Path $OutputPath ) {
             
-                Remove-Item -Force $OutputPath
+                Remove-Item -Path $OutputPath -Force | Out-Null
             }
         }
     }
@@ -156,7 +156,7 @@ Function Get-RemoteFile {
             # Cleanup if the download fails
             If ( Test-Path -Path $OutputPath ) {
             
-                Remove-Item -Force $OutputPath
+                Remove-Item -Path $OutputPath -Force | Out-Null
             }
         }
     }
@@ -205,7 +205,7 @@ Function Wait-Process {
 
 			If ( Test-Path -Path $OutputFilePath ) {
 
-				Remove-Item "$OutputFilePath" 2> $ScriptError
+				Remove-Item -Path $OutputFilePath -Force 2> $ScriptError
 				Write-Log $ScriptError $LogPath
 			}
 		}
@@ -234,7 +234,7 @@ Function Write-CommandError {
 	Write-Log -Message $Message -LogPath $LogPath
 }
 
-# Send specified message along with a timestamp to a specified .csv file
+# Send specified message along with a timestamp to a .csv file
 Function Write-Log {
 
     Param(
