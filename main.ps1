@@ -271,7 +271,7 @@ Write-CommandError -ErrorFile $ErrorFile -LogPath $Log
 Remove-Item -Path $LicenseFile -Force | Out-Null
 Remove-Item -Path "$env:temp\$env:computername*.cab" -Force | Out-Null
 
-$LicenseXML.DiagReport.LicensingData.OA3ProductKey = "Redacated"
+$LicenseXML.DiagReport.LicensingData.OA3ProductKey = "Redacted"
 $LicenseXML.DiagReport.GenuineAuthz.ServerProps = "Redacted"
 $LicenseXML.DiagReport.ChildNodes | Out-File -FilePath "$path\genuine.txt"
 
