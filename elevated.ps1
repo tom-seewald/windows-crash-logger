@@ -18,8 +18,8 @@ $WindowsVersion = "$MajorVer" + "." + "$MinorVer" -as [decimal]
 $ScriptPath = Split-Path $MyInvocation.MyCommand.Path -Parent
 
 # Set output files for logging
-$Log = Join-Path -Path "$env:TEMP" -ChildPath "script-log-elevated.csv"
-$ErrorFile = Join-Path -Path "$env:TEMP" -ChildPath "error-temp-elevated.txt"
+$Log = Join-Path -Path $env:TEMP -ChildPath "script-log-elevated.csv"
+$ErrorFile = Join-Path -Path $env:TEMP -ChildPath "error-temp-elevated.txt"
 $CrashDumps = Join-Path -Path $Path -ChildPath "Crash Dumps"
 $PowerReports = Join-Path -Path $Path -ChildPath "Power Reports"
 $WER = Join-Path -Path $Path -ChildPath "Error Reports"
@@ -34,7 +34,7 @@ New-Item -ItemType File -Path $ErrorFile -Force -ErrorAction Stop | Out-Null
 
 If ( Test-Path -Path $Log ) {
 
-	Remove-Item -Force $Log | Out-Null
+	Remove-Item -Path $Log -Force | Out-Null
 }
 
 # Import custom module containing support functions
@@ -93,10 +93,10 @@ If ( $DefaultPath -eq $MinidumpPath ) {
 
 		Get-ChildItem $MinidumpPath | Sort-Object LastWriteTime -Descending | Out-File -Append -FilePath "$CrashDumps\mini-crash-dumps.txt"
 
-		If ( $(Get-ChildItem -Filter "*.dmp" -Path "$MinidumpPath") -ne $null ) {
+		If ( $(Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath) -ne $null ) {
 
 			Write-Host "Copying crash dumps from $MinidumpPath..."
-			Get-ChildItem -Filter "*.dmp" -Path "$MinidumpPath" | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$Path\Crash Dumps" } -ErrorAction SilentlyContinue -ErrorVariable ScriptError
+			Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$Path\Crash Dumps" } -ErrorAction SilentlyContinue -ErrorVariable ScriptError
 			Write-Log -Message $ScriptError -LogPath $Log
 		}
 
@@ -122,10 +122,10 @@ Else {
 
 		Get-ChildItem $MinidumpPath | Sort-Object LastWriteTime -Descending | Out-File -Append -FilePath "$CrashDumps\mini-crash-dumps.txt"
 
-		If ( $(Get-ChildItem -Filter "*.dmp" -Path "$MinidumpPath") -ne $null ) {
+		If ( $(Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath) -ne $null ) {
 
 			Write-Host "Copying crash dumps from $MinidumpPath..."
-			Get-ChildItem -Filter "*.dmp" -Path "$MinidumpPath" | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$Path\Crash Dumps" } -ErrorAction SilentlyContinue -ErrorVariable ScriptError
+			Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$Path\Crash Dumps" } -ErrorAction SilentlyContinue -ErrorVariable ScriptError
 			Write-Log -Message $ScriptError -LogPath $Log
 		}
 
@@ -146,10 +146,10 @@ Else {
 
 		Get-ChildItem $DefaultPath | Sort-Object LastWriteTime -Descending | Out-File -Append -FilePath "$CrashDumps\mini-crash-dumps.txt"
 
-		If ( $(Get-ChildItem -Filter "*.dmp" -Path "$DefaultPath") -ne $null ) {
+		If ( $(Get-ChildItem -Filter "*.dmp" -Path $DefaultPath) -ne $null ) {
 
 			Write-Host "Copying crash dumps from $DefaultPath..."
-			Get-ChildItem -Filter "*.dmp" -Path "$DefaultPath"  | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$Path\Crash Dumps" } -ErrorAction SilentlyContinue -ErrorVariable ScriptError
+			Get-ChildItem -Filter "*.dmp" -Path $DefaultPath | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$Path\Crash Dumps" } -ErrorAction SilentlyContinue -ErrorVariable ScriptError
 			Write-Log -Message $ScriptError -LogPath $Log
 		}
 
@@ -175,7 +175,7 @@ If ( $DumpPath -eq "$env:SystemRoot\Memory.dmp" ) {
 	If ( Test-Path $DumpPath ) {
 
 		Write-Output "Crash dump found at $DumpPath" | Out-File -FilePath "$CrashDumps\memory-dumps.txt"
-		Write-Output "Creation date: $((Get-Item "$DumpPath").LastWriteTime)" | Out-File -Append -FilePath "$CrashDumps\memory-dumps.txt"
+		Write-Output "Creation date: $((Get-Item $DumpPath).LastWriteTime)" | Out-File -Append -FilePath "$CrashDumps\memory-dumps.txt"
 		Write-Output "Size on disk: $([math]::truncate((Get-Item $DumpPath).Length / 1MB)) MB" | Out-File -Append -FilePath "$CrashDumps\memory-dumps.txt"
 	}
 
@@ -190,7 +190,7 @@ Else {
 	If ( Test-Path $DumpPath ) {
 
 		Write-Output "Crash dump found at $DumpPath" | Out-File -FilePath "$CrashDumps\memory-dumps.txt"
-		Write-Output "Creation date: $((Get-Item "$DumpPath").LastWriteTime)" | Out-File -Append -FilePath "$CrashDumps\memory-dumps.txt"
+		Write-Output "Creation date: $((Get-Item $DumpPath).LastWriteTime)" | Out-File -Append -FilePath "$CrashDumps\memory-dumps.txt"
 		Write-Output "Size on disk: $([math]::truncate((Get-Item $DumpPath).Length / 1MB)) MB" | Out-File -Append -FilePath "$CrashDumps\memory-dumps.txt"
 	}
 
@@ -216,7 +216,7 @@ Else {
 If ( $(Test-Path -Path "$env:SystemRoot\LiveKernelReports") -eq $True -and $(Get-ChildItem -Path "$env:SystemRoot\LiveKernelReports" ) -ne $null ) {
 
 	$LengthMB = @{Name="Size (MB)";Expression={[math]::Round($_.Length / 1MB, 2)}}
-	Get-ChildItem -Path "$env:SystemRoot\LiveKernelReports" -Recurse -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object Name,LastWriteTime,$LengthMB | Out-File -FilePath "$CrashDumps\live-kernel-reports.txt"
+	Get-ChildItem -Filter "*.dmp" -Path "$env:SystemRoot\LiveKernelReports" -Recurse -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object Name,LastWriteTime,$LengthMB | Out-File -FilePath "$CrashDumps\live-kernel-reports.txt"
 	Write-Log -Message $ScriptError -LogPath $Log
 }
 
@@ -307,7 +307,7 @@ Else {
 
 If ( Test-Path -Path "$ScriptPath\autorunsc.exe" ) {
 
-	Remove-Item -Force "$ScriptPath\autorunsc.exe"
+	Remove-Item -Path "$ScriptPath\autorunsc.exe" -Force | Out-Null
 }
 
 If ( $(Test-Path -Path $Log) -eq "True" -and (Get-Item $Log).Length -gt 0 ) {
@@ -319,11 +319,11 @@ If ( $(Test-Path -Path $Log) -eq "True" -and (Get-Item $Log).Length -gt 0 ) {
 	$LogACL.AddAccessRule($NewAccessRule)
 	Set-Acl -Path $Log -AclObject $LogACL
 
-	# Move log into $Path if it is non-empty
+	# Move log into $Path
 	Move-Item -Path $Log -Destination $Path
 }
 
 If ( Test-Path -Path $ErrorFile ) {
 
-	Remove-Item -Force $ErrorFile 2> $null
+	Remove-Item -Path $ErrorFile -Force | Out-Null
 }
