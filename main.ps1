@@ -3,18 +3,26 @@
 ##############################
 
 # Version String
-$ScriptVersion = "Beta10 - 3/24/18"
+$ScriptVersion = "Beta12 - 7/28/18"
 
-# Detect Windows version, convert the value from a string to a decimal
-$MajorVer = [System.Environment]::OSVersion.Version.Major
-$MinorVer = [System.Environment]::OSVersion.Version.Minor
-$WindowsVersion = "$MajorVer" + "." + "$MinorVer" -as [decimal]
+# Detect Windows version
+$WindowsBuild  = [System.Environment]::OSVersion.Version.Build
+$Win1709Build  = 16299
+$Win10MinBuild = 10240
+$Win81Build    = 9600
+
+# Check if we are running PowerShell Core, and relaunch with native PowerShell if possible.  
+# This is needed as some cmdlets and variables only work with legacy PowerShell (Get-Disk, Get-PhysicalDisk, Get-MpPreference, etc.)
+If ( $PSVersionTable.PSEdition -eq "core" )
+{
+	Return "This script only works with Windows-native Powershell."
+}
 
 # Abort if Controlled Folder Access is enabled, as it prevents log files from being placed on the desktop
-If ( $WindowsVersion -ge 10 ) {
-
-	If ( (Get-MpPreference).EnableControlledFolderAccess -eq 1 ) {
-
+If ( $WindowsBuild -ge $Win1709Build )
+{
+	If ( (Get-MpPreference).EnableControlledFolderAccess -eq 1 )
+	{
 		Write-Warning "Controlled Folder Access is enabled in Windows Defender, this prevents the script from placing log files on your Desktop."
 		Write-Host "`n"
 		Write-Warning "If you would like allow this script to run, please temporarily disable Controlled Folder Access in Windows Defender Security Center and then re-launch this script."
@@ -25,8 +33,8 @@ If ( $WindowsVersion -ge 10 ) {
 }
 
 # If the OS is 64-bit and this script was launched with 32-bit PowerShell, relaunch with 64-bit PowerShell and Exit the current instance
-If ( [Environment]::Is64BitOperatingSystem -eq $True -and [Environment]::Is64BitProcess -eq $False ) {
-
+If ( [Environment]::Is64BitOperatingSystem -eq $True -and [Environment]::Is64BitProcess -eq $False )
+{
 	&"$env:SystemRoot\sysnative\windowspowershell\v1.0\powershell.exe" -NoProfile $myInvocation.InvocationName
 	Exit
 }
@@ -54,338 +62,407 @@ Write-Host $ScriptVersion
 Read-Host -Prompt "Press Enter to continue"
 Clear-Host
 
-# Parent directory of this script, used instead of $PSScriptRoot as that is not available on stock Windows 7 SP1
-$ScriptPath = Split-Path $MyInvocation.MyCommand.Path -Parent
+# Create folder name
+$Time       = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+$FolderName = "$env:COMPUTERNAME-($Time)"
 
-# Set variables for output folders
-$Time = (Get-Date).ToString("yyyy-MM-dd HH mm")
-$Name = "$env:computername ($Time)"
-$Path = Join-Path -Path "$home\Desktop" -ChildPath $Name
-$Log = Join-Path -Path $env:TEMP -ChildPath "script-log.csv"
-$ErrorFile = Join-Path -Path $env:TEMP -ChildPath "error-temp.txt"
-$EventLogs = Join-Path -Path $Path -ChildPath "Event Logs"
+# Define paths to other script files
+$ElevatedScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "elevated.ps1"
+$LoggerModule       = Join-Path -Path $PSScriptRoot -ChildPath "logger-module.psm1"
+
+# Log file
+$Transcript = Join-Path $env:TEMP -ChildPath "transcript-main.txt"
+
+# Output folders
+$Path         = Join-Path -Path "$home\Desktop" -ChildPath $FolderName
+$EventLogs    = Join-Path -Path $Path -ChildPath "Event Logs"
 $PowerReports = Join-Path -Path $Path -ChildPath "Power Reports"
-$LoggerModule = Join-Path -Path $ScriptPath -ChildPath "logger-module.psm1"
-$ElevatedScriptPath = Join-Path -Path $ScriptPath -ChildPath "elevated.ps1"
-$Zip = "$Path" + ".zip"
+
+# Output files
+$AppEvents         = Join-Path -Path $EventLogs -ChildPath "application-events.txt"
+$BIOS              = Join-Path -Path $Path -ChildPath "bios.txt"
+$CPU               = Join-Path -Path $Path -ChildPath "cpu.txt"
+$DriverTable       = Join-Path -Path $Path -ChildPath "driver-table.txt"
+$DriverVersions    = Join-Path -Path $Path -ChildPath "driver-versions.txt"
+$DxDiagFile        = Join-Path -Path $Path -ChildPath "dxdiag.txt"
+$FileHashes        = Join-Path -Path $env:LOCALAPPDATA -ChildPath "hashes.txt"
+$GPU               = Join-Path -Path $Path -ChildPath "gpu.txt"
+$HostsReport       = Join-Path -Path $Path -ChildPath "hosts.txt"
+$InstalledSoftware = Join-Path -Path $Path -ChildPath "installed-software.txt"
+$LicenseFile       = Join-Path -Path $Path -ChildPath "genuine.txt"
+$LicenseFileTemp   = Join-Path -Path $env:TEMP -ChildPath "genuine.xml"
+$Motherboard       = Join-Path -Path $Path -ChildPath "motherboard.txt"
+$NetworkInfo       = Join-Path -Path $Path -ChildPath "network-info.txt"
+$OSDetails         = Join-Path -Path $Path -ChildPath "os-details.txt"
+$PnPEvents         = Join-Path -Path $EventLogs -ChildPath "pnp-events.txt"
+$PowerPlan         = Join-Path -Path $PowerReports -ChildPath "power-plan.txt"
+$RAM               = Join-Path -Path $Path -ChildPath "ram.txt"
+$SystemEvents      = Join-Path -Path $EventLogs -ChildPath "system-events.txt"
+$SystemInfo        = Join-Path -Path $Path -ChildPath "msinfo32.nfo"
+$WindowsUpdates    = Join-Path -Path $Path -ChildPath "windows-updates.txt"
+$Zip               = $Path + ".zip"
+
+# Where to download autoruns from and where to place the executable
+$AutorunsURL  = "https://live.sysinternals.com/autorunsc.exe"
+$AutorunsPath = Join-Path -Path $PSScriptRoot -ChildPath "autorunsc.exe"
+
+# Registry locations
+$32bitSoftware       = "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+$InstalledComponents = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components"
+$NativeSoftware      = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+$UserSoftware        = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall"
+
+# Native file and folder locations
+$HostsFile = Join-Path $env:SystemRoot -ChildPath "System32\drivers\etc\hosts"
+$System32  = Join-Path -Path $env:SystemRoot -ChildPath "System32"
+
+# Full paths of executables used in this script, in case the system's path environment variables have been messed with
+$DriverQueryPath = Join-Path -Path $System32 -ChildPath "driverquery.exe"
+$DXDiagPath      = Join-Path -Path $System32 -ChildPath "dxdiag.exe"
+$IpconfigPath    = Join-Path -Path $System32 -ChildPath "ipconfig.exe"
+$LicenseDiagPath = Join-Path -Path $System32 -ChildPath "licensingdiag.exe"
+$MsInfo32Path    = Join-Path -Path $System32 -ChildPath "msinfo32.exe" 
+$PowerCfgPath    = Join-Path -Path $System32 -ChildPath "powercfg.exe"
+$PowerShellPath  = Join-Path -Path $System32 -ChildPath "WindowsPowerShell\v1.0\powershell.exe"
+$RoutePath       = Join-Path -Path $System32 -ChildPath "route.exe"
+$WevtUtilPath    = Join-Path -Path $System32 -ChildPath "wevtutil.exe"
+
+# Timeouts for asynchronous processes to complete, in seconds
+$DriverQueryTimeout    = 60
+$DxDiagTimeout         = 60
+$ElevatedScriptTimeout = 150
+$LicenseTimeout        = 60
+$MsInfo32Timeout       = 300
+
+# Begin logging
+Start-Transcript -Path $Transcript -Force | Out-Null
 
 # Check for pre-existing files and folders, and remove them if they exist
-If ( Test-Path -Path $Path ) { Remove-Item -Path $Path -Recurse -Force }
-If ( Test-Path -Path $Zip ) { Remove-Item -Path $Zip -Force }
-If ( Test-Path -Path $Log ) { Remove-Item -Path $Log -Force }
-If ( Test-Path -Path $ErrorFile ) { Remove-Item -Path $ErrorFile -Force }
+If ( Test-Path -Path $Path ) 
+{
+	Remove-Item -Path $Path -Recurse -Force | Out-Null
+}
+
+If ( Test-Path -Path $Zip )
+{
+	Remove-Item -Path $Zip -Force | Out-Null
+}
 
 # Create directories and files
-New-Item -ItemType Directory -Path $Path -Force -ErrorAction Stop | Out-Null
-New-Item -ItemType Directory -Path $EventLogs -Force -ErrorAction Stop | Out-Null
-New-Item -ItemType Directory -Path $PowerReports -Force -ErrorAction Stop | Out-Null
-New-Item -ItemType File -Path $ErrorFile -Force -ErrorAction Stop | Out-Null
+Try
+{
+	New-Item -ItemType Directory -Path $Path -Force | Out-Null
+	New-Item -ItemType Directory -Path $EventLogs | Out-Null
+	New-Item -ItemType Directory -Path $PowerReports | Out-Null
+}
+
+Catch
+{
+	Write-Warning "Unable to create required output directories."
+	Write-Output $error[0]
+	Return "Script cannot continue."
+}
 
 # Import custom module containing support functions
-Try {
-
+Try
+{
     Import-Module $LoggerModule
 }
 
-Catch {
-
-	Write-Warning "Could not import $LoggerModule, exiting script."
-	$TimeStamp = (Get-Date).ToString("yyyy/MM/dd HH:mm:ss")
-    $ImportError = $TimeStamp + "," + "Failed to import $LoggerModule, exiting script."
-    Write-Ouptut $ImportError | Out-File -Append -FilePath $Log
-    Exit
+Catch
+{
+    Write-Warning "Failed to import $LoggerModule."
+	Write-Output $error[0]
+    Return "Script cannot continue."
 }
 
 # Set window size to 1000 by 1000 to avoid truncation when sending output to files
 $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(1000,1000)
 
-# Check that the OS is supported
-If ( $WindowsVersion -lt 6.1 ) {
-
-	Write-Log -Message "Unsupported version of Windows, kernel version less than 6.1" -LogPath $Log
-	Write-Warning "Unsupported version of Windows detected!"
-	Write-Warning "This script has not been tested on any release prior to Windows 7!"
-}
-
-If ( $WindowsVersion -eq 6.2 ) {
-
-	Write-Log -Message "Unsupported version of Windows detected, Windows 8" -LogPath $Log
-	Write-Warning "Unsupported version of Windows detected!"
-	Write-Warning "This script has not been tested on Windows 8, please upgrade!"
+# Check that the OS is supported, warn if it is not
+If ( $WindowsBuild -lt $Win81Build )
+{
+	Write-Warning "Unsupported version of Windows detected.  Minimum build supported: $Win81Build, your build is: $WindowsBuild."
 }
 
 # Generate System Information Report
 Write-Host "Generating system information report, this may take a while..."
 
-Try {
-
-	$MsInfo32 = Start-Process -FilePath "$env:SystemRoot\System32\msinfo32.exe" -ArgumentList """/nfo"" ""$Path\msinfo32.nfo""" -PassThru
+Try
+{
+	$MsInfo32 = Start-Process -FilePath $MsInfo32Path -ArgumentList """/nfo"" ""$SystemInfo""" -PassThru
 }
 
-Catch {
-
-    Write-Warning "Failed to launch msinfo32.exe!"
-    Write-Log -Message "Failed to launch msinfo32.exe!" -LogPath $Log
-    Write-Log -Message $error[0] -LogPath $Log
+Catch
+{
+    Write-Warning "Failed to launch $MsInfo32Path"
+	Write-Output $error[0]
 }
 
 # Download autorunsc.exe, this will later be run in elevated.ps1
-$AutorunsURL = "https://live.sysinternals.com/autorunsc.exe"
-Get-RemoteFile -URL $AutorunsURL -FileName "autorunsc" -OutputPath "$ScriptPath\autorunsc.exe" -LogPath $Log
+Get-RemoteFile -URL $AutorunsURL -FileName "autorunsc" -DestinationPath $AutorunsPath
 
 # Start elevated.ps1
-If ( Test-Path -Path $ElevatedScriptPath ) {
-
+If ( Test-Path -Path $ElevatedScriptPath )
+{
 	Write-Host "Launching elevated script..."
 
-	Try {
-	
-		$ElevatedScript = Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
+	Try
+	{
+		$ElevatedScript = Start-Process -FilePath $PowerShellPath `
 										-ArgumentList """-ExecutionPolicy"" ""Bypass"" ""-NonInteractive"" ""-NoProfile"" ""-File"" ""$ElevatedScriptPath"" ""$Path""" `
 										-Verb RunAs `
 										-PassThru
 	}
 
-	Catch {
-
+	Catch
+	{
 		Write-Warning "Failed to launch elevated script!" 
-        Write-Log -Message "Failed to launch elevated script!" -LogPath $Log
-        Write-Log -Message $error[0] -LogPath $Log
+        Write-Output $error[0]
 	}
 }
 
-Else {
-
+Else
+{
 	Write-Warning "$ElevatedScriptPath not found!"
-	Write-Log -Message "$ElevatedScriptPath not found!" -LogPath $Log
 }
 
 # Start DirectX Diagnostics Report
 Write-Host "Running DirectX diagnostics..."
 
-Try {
-
-	$DxDiag = Start-Process -FilePath "$env:SystemRoot\System32\dxdiag.exe" -ArgumentList "/dontskip","/whql:off","/t","$Path\dxdiag.txt" -NoNewWindow -PassThru
+Try
+{
+	$DxDiag = Start-Process -FilePath $DXDiagPath -ArgumentList "/dontskip","/whql:off","/t","$DxDiagFile" -WindowStyle Hidden -PassThru
 }
 
-Catch {
-
+Catch
+{
 	Write-Warning "Failed to run DirectX diagnostics!"
-    Write-Log -Message "Failed to run dxdiag.exe" -LogPath $Log
-    Write-Log -Message $error[0] -LogPath $Log
+    Write-Output $error[0]
+}
+
+# Start Driver Query
+Try
+{
+	$DriverQuery = Start-Process -FilePath $DriverQueryPath -ArgumentList "/v","/fo table" -WindowStyle Hidden -RedirectStandardOutput $DriverTable -PassThru
+}
+
+Catch
+{
+	Write-Warning "Failed to run Driver Query!"
+    Write-Output $error[0]
+}
+
+# Start License Diagnostics
+Try
+{
+	$LicenseDiag = Start-Process -FilePath $LicenseDiagPath -ArgumentList "/report","$LicenseFileTemp" -WindowStyle Hidden -PassThru
+}
+
+Catch
+{
+	Write-Warning "Failed to run licensing diagnostics!"
+    Write-Output $error[0]
 }
 
 # Export Event Logs (2592000000 ms = 30 days)
 Write-Host "Exporting Application event Log..."
-&"$env:SystemRoot\System32\wevtutil.exe" query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text | Out-File -FilePath "$EventLogs\application-events.txt" 2> $ErrorFile
-Write-CommandError -ErrorFile $ErrorFile -LogPath $Log
+&$WevtUtilPath query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text | Out-File -FilePath $AppEvents 2> $null
 
 Write-Host "Exporting System event log..."
-&"$env:SystemRoot\System32\wevtutil.exe" query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text | Out-File -FilePath "$EventLogs\system-events.txt" 2> $ErrorFile
-Write-CommandError -ErrorFile $ErrorFile -LogPath $Log
+&$WevtUtilPath query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text | Out-File -FilePath $SystemEvents 2> $null
 
-# Kernel PnP Event log only exists on Windows 8.1 and newer
-If ( $WindowsVersion -ge "6.3" ) {
+Write-Host "Exporting Kernel PnP event log..."
+&$WevtUtilPath query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text | Out-File -FilePath $PnPEvents 2> $null
 
-	Write-Host "Exporting Kernel PnP event log..."
-	&"$env:SystemRoot\System32\wevtutil.exe" query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text | Out-File -FilePath "$EventLogs\pnp-events.txt" 2> $ErrorFile
-	Write-CommandError -ErrorFile $ErrorFile -LogPath $Log
-}
+# OS details
+Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object Name, Version, BuildNumber, OSArchitecture, LocalDateTime, LastBootUpTime, InstallDate, BootDevice, SystemDevice | Out-File -FilePath $OSDetails
 
 # Driver information
-Write-Host "Gathering driver information..."
-&"$env:SystemRoot\System32\driverquery.exe" /v /fo table 2> $ErrorFile | Select-Object -Skip 1 | Out-File -FilePath "$Path\driver-table.txt"
-Write-CommandError -ErrorFile $ErrorFile -LogPath $Log
-
+Write-Host "Gathering device driver information..."
 $DriverInfoAttributes = "DeviceName", "FriendlyName", "InfName", "DriverVersion", "IsSigned", "DriverDate"
-Get-WmiObject Win32_PnPSignedDriver -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object -Property $DriverInfoAttributes | Where-Object {$_.DeviceName -ne $null -or $_.FriendlyName -ne $null -or $_.InfName -ne $null } | Sort-Object DeviceName | Format-Table -AutoSize | Out-File -FilePath "$Path\driver-versions.txt"
-Write-Log -Message $ScriptError -LogPath $Log
+Get-CimInstance -ClassName Win32_PnPSignedDriver | Select-Object -Property $DriverInfoAttributes | Sort-Object DeviceName | Format-Table -AutoSize | Out-File -FilePath $DriverVersions
 
 # Get default power plan
 Write-Host "Checking power settings..."
-&"$env:SystemRoot\System32\powercfg.exe" /list 2> $ErrorFile | Out-File -FilePath "$PowerReports\power-plan.txt"
-Write-CommandError -ErrorFile $ErrorFile -LogPath $Log
+&$PowerCfgPath /list 2> $null | Out-File -FilePath $PowerPlan
 
 # RAM info
 Write-Host "Getting hardware information..."
-$MemoryAttributes = "BankLabel", "DeviceLocator", "Manufacturer", "Capacity", "ConfiguredClockspeed", "ConfiguredVoltage", "SerialNumber", "PartNumber"
-Get-WmiObject Win32_PhysicalMemory -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $MemoryAttributes | Sort-Object BankLabel, DeviceLocator | Format-List | Out-File -FilePath "$Path\ram.txt"
-Write-Log -Message $ScriptError -LogPath $Log
+Get-MemoryInfo | Out-File -FilePath $RAM
 
 # Processor information
 $ProcessorAttributes = "Name", "Description", "Manufacturer", "DeviceID", "SocketDesignation", "CurrentClockSpeed", "CPUStatus", `
 					   "LastErrorCode", "ErrorDescription", "PartNumber", "Revision", "SerialNumber", "ProcessorId", "Status", `
 					   "StatusInfo", "Stepping", "CurrentVoltage", "VoltageCaps"
-Get-WmiObject Win32_Processor -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $ProcessorAttributes | Format-List | Out-File -FilePath "$Path\cpu.txt"
-Write-Log -Message $ScriptError -LogPath $Log
-
-# Disk and partition information
-Get-DiskInformation
-
-$SizeGB = @{Name="Size (GB)";Expression={[math]::Round($_.Capacity / 1GB, 2)}}
-$FreeGB = @{Name="Free (GB)";Expression={[math]::Round($_.FreeSpace / 1GB, 2)}}
-$DevicePath = @{Name="Device Path";Expression={[diskinfo]::GetDeviceName($_.DriveLetter)}}
-
-Get-WmiObject Win32_Volume -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Where-Object { $_.DriveLetter -ne $null } | Select-Object DriveLetter, $SizeGB, $FreeGB, $DevicePath | Sort-Object DriveLetter | Format-Table -AutoSize > "$Path\partitions.txt"
-Write-Log -Message $ScriptError -LogPath $Log
-
-If ( $WindowsVersion -ge "10.0" ) {
-
-	Get-Partition -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Format-List >> "$Path\partitions.txt"
-	Write-Log -Message $ScriptError -LogPath $Log
-
-	$DiskNumbers = (Get-Disk).Number
-	$DiskAttributes = "FriendlyName", "Model", "SerialNumber", "Manufacturer", "Number", "IsBoot", "AllocatedSize", `
-					  "HealthStatus", "OperationalStatus", "BusType", "FirmwareVersion", "PartitionStyle", "Path"
-	ForEach ( $DiskNumber in $DiskNumbers ) {
-
-		Get-Disk -Number $DiskNumber -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $DiskAttributes | Format-List | Out-File -Append -FilePath "$Path\disks.txt"
-		Write-Log -Message $ScriptError -LogPath $Log
-	}
-}
+Get-CimInstance -ClassName Win32_Processor | Select-Object $ProcessorAttributes | Format-List | Out-File -FilePath $CPU
 
 # System Board information
 $BaseBoardAttributes = "Product", "Model", "Version", "Manufacturer", "Description"
-Get-WmiObject Win32_BaseBoard -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $BaseBoardAttributes | Format-List | Out-File -FilePath "$Path\motherboard.txt"
-Write-Log -Message $ScriptError -LogPath $Log
+Get-CimInstance -ClassName Win32_BaseBoard | Select-Object $BaseBoardAttributes | Format-List | Out-File -FilePath $Motherboard
 
 # UEFI/BIOS properties
 $BiosAttributes = "SMBIOSBIOSVersion", "Manufacturer", "Name", "Version", "BIOSVersion", "ReleaseDate"
-Get-WmiObject Win32_Bios -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $BiosAttributes | Format-List | Out-File -Append -FilePath "$Path\bios.txt"
-Write-Log -Message $ScriptError -LogPath $Log
+Get-CimInstance -ClassName Win32_Bios | Select-Object $BiosAttributes | Format-List | Out-File -Append -FilePath $BIOS
 
 # GPU information
 $GpuAttributes = "Name", "DeviceID", "PNPDeviceID", "VideoProcessor", "CurrentRefreshRate", "VideoModeDescription", "AdapterRAM", `
 				 "DriverVersion", "InfFilename", "InstalledDisplayDrivers", "InstallDate", "DriverDate", "Status", "StatusInfo", `
 				 "LastErrorCode", "ErrorDescription"
-Get-WmiObject Win32_VideoController -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $GpuAttributes | Format-List | Out-File -FilePath "$Path\gpu.txt"
-Write-Log -Message $ScriptError -LogPath $Log
-
-# Windows license information, redact the license key, and export from xml to flat text
-Write-Host "Creating Windows license report..."
-$LicenseFile = "$env:TEMP\genuine.xml"
-&"$env:SystemRoot\System32\licensingdiag.exe" /report $LicenseFile 2> $ErrorFile | Out-Null
-Write-CommandError -ErrorFile $ErrorFile -LogPath $Log
-[xml] $LicenseXML = Get-Content -Path $LicenseFile
-
-Remove-Item -Path $LicenseFile -Force | Out-Null
-Remove-Item -Path "$env:temp\$env:computername*.cab" -Force | Out-Null
-
-$LicenseXML.DiagReport.LicensingData.OA3ProductKey = "Redacted"
-$LicenseXML.DiagReport.GenuineAuthz.ServerProps = "Redacted"
-$LicenseXML.DiagReport.ChildNodes | Out-File -FilePath "$path\genuine.txt"
+Get-CimInstance -ClassName Win32_VideoController | Select-Object $GpuAttributes | Format-List | Out-File -FilePath $GPU
 
 # Installed software, first check native and then 32-bit (if it exists).
 Write-Host "Listing installed software..."
 
 $SoftwareAttributes = "DisplayName", "DisplayVersion", "Publisher", "InstallDate"
-Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $SoftwareAttributes | `
+Get-ItemProperty -Path "$NativeSoftware\*" | Select-Object $SoftwareAttributes | `
 Where-Object { $_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null } | `
-Sort-Object DisplayName | Format-Table -AutoSize | Out-File -FilePath "$Path\installed-software.txt"
-Write-Log -Message $ScriptError -LogPath $Log
+Sort-Object DisplayName | Format-Table -AutoSize | Out-File -FilePath $InstalledSoftware
 
-If ( Test-Path -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall" ) {
-
-	Write-Output "32-bit Software" | Out-File -Append -FilePath "$Path\installed-software.txt"
-
-	Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $SoftwareAttributes | Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | Sort-Object DisplayName | Format-Table -AutoSize | Format-Table -AutoSize | Out-File -Append -FilePath "$Path\installed-software.txt"
-	Write-Log -Message $ScriptError -LogPath $Log
+If ( Test-Path -Path $32bitSoftware )
+{
+	Write-Output "32-bit Software" | Out-File -Append -FilePath $InstalledSoftware
+	Get-ItemProperty -Path "$32bitSoftware\*" | Select-Object $SoftwareAttributes | Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | Sort-Object DisplayName | Format-Table -AutoSize | Format-Table -AutoSize | Out-File -Append -FilePath $InstalledSoftware
 }
 
-Write-Output "User-specific Software" >> "$Path\installed-software.txt"
-Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object $SoftwareAttributes | Where-Object {$_.DisplayName -ne $null} | Sort-Object DisplayName | Format-Table -AutoSize | Out-File -Append -FilePath "$Path\installed-software.txt"
-Write-Log -Message $ScriptError -LogPath $Log
+Write-Output "User-specific Software" | Out-File -Append -FilePath $InstalledSoftware
+Get-ItemProperty "$UserSoftware\*" | Select-Object $SoftwareAttributes | Where-Object {$_.DisplayName -ne $null} | Sort-Object DisplayName | Format-Table -AutoSize | Out-File -Append -FilePath $InstalledSoftware
 
-Write-Output "Installed Windows Components" >> "$Path\installed-software.txt"
-Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\*" -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object "(Default)", ComponentID, Version, Enabled | Where-Object {$_."(Default)" -ne $null -or $_.ComponentID -ne $null} | Sort-Object "(default)" | Format-Table -AutoSize | Out-File -Append -FilePath "$Path\installed-software.txt"
-Write-Log -Message $ScriptError -LogPath $Log
+Write-Output "Installed Windows Components" | Out-File -Append -FilePath $InstalledSoftware
+Get-ItemProperty "$InstalledComponents\*" | Select-Object "(Default)", ComponentID, Version, Enabled | Where-Object {$_."(Default)" -ne $null -or $_.ComponentID -ne $null} | Sort-Object "(default)" | Format-Table -AutoSize | Out-File -Append -FilePath $InstalledSoftware
 
 # Installed Windows Updates
 Write-Host "Listing installed Windows updates..."
-Get-WmiObject Win32_QuickFixEngineering -ErrorAction SilentlyContinue -ErrorVariable ScriptError | Select-Object HotFixID,Description,InstalledOn | Sort-Object InstalledOn,HotFixID | Format-Table -AutoSize | Out-File -FilePath "$Path\windows-updates.txt"
-Write-Log -Message $ScriptError -LogPath $Log
+Get-CimInstance -ClassName Win32_QuickFixEngineering | Select-Object HotFixID,Description,InstalledOn | Sort-Object InstalledOn,HotFixID | Format-Table -AutoSize | Out-File -FilePath $WindowsUpdates
 
 # Basic networking information
 Write-Host "Finding network information..."
-&"$env:SystemRoot\System32\ipconfig.exe" /allcompartments /all 2> $ErrorFile | Select-Object -Skip 1 | Out-File -FilePath "$Path\network-info.txt"
-Write-CommandError -ErrorFile $ErrorFile -LogPath $Log
-
-&"$env:SystemRoot\System32\route.exe" print | Out-File -Append -FilePath "$Path\network-info.txt" 2> $ErrorFile
-Write-CommandError -ErrorFile $ErrorFile -LogPath $Log
+&$IpconfigPath /allcompartments /all 2> $null | Select-Object -Skip 1 | Out-File -FilePath $NetworkInfo
+&$RoutePath print | Out-File -Append -FilePath $NetworkInfo 2> $null
 
 # Copy relevant entries from the hosts file
 Write-Host "Examining hosts file..."
 
-If ( Test-Path -Path "$env:SystemRoot\System32\drivers\etc\hosts" ) {
-
-	Get-Content -Path "$env:SystemRoot\System32\drivers\etc\hosts" -ErrorAction SilentlyContinue -ErrorVariable ScriptError| Select-String '(127.0.0.1)|(0.0.0.0)' | Out-File -FilePath "$Path\hosts.txt"
-	Write-Log -Message $ScriptError -LogPath $Log
+If ( Test-Path -Path $HostsFile )
+{
+	Get-Content -Path $HostsFile | Select-String '(127.0.0.1)|(0.0.0.0)' | Out-File -FilePath $HostsReport
 }
 
-Else {
-
-	Write-Log -Message "Hosts file not found." -LogPath $Log
+Else
+{
+	Write-Warning "Hosts file not found."
 }
 
-# Wait if dxdiag.exe has not finished, kill process if timeout is reached
-If ( $DxDiag -ne $null ) {
-
-	Wait-Process -ProcessObject $DxDiag -ProcessName "dxdiag.exe" -TimeoutSeconds 10 -LogPath $Log -OutputFilePath "$Path\dxdiag.txt"
+# Wait for licensingdiag.exe to finish
+If ( $LicenseDiag -ne $null )
+{
+	Wait-Process -ProcessObject $LicenseDiag -ProcessName "licensingdiag.exe" -TimeoutSeconds $LicenseTimeout -DestinationPath $LicenseFileTemp
 }
 
-# Wait if msinfo32.exe has not finished, kill process if timeout is reached
-If ( $MsInfo32 -ne $null ) {
+# Now that we know licensingdiag.exe has finished, attempt to process the xml file, redact the license key, and export from xml to flat text
+Write-Host "Creating Windows license report..."
+If ( Test-Path -Path $LicenseFileTemp )
+{
+	[xml] $LicenseXML = Get-Content -Path $LicenseFileTemp
 
-	Wait-Process -ProcessObject $MsInfo32 -ProcessName "msinfo32.exe" -TimeoutSeconds 300 -LogPath $Log -OutputFilePath "$Path\msinfo32.nfo"
+	# Cleanup other files generated by licensingdiag.exe
+	Remove-Item -Path $LicenseFileTemp -Force | Out-Null
+	Remove-Item -Path "$env:TEMP\$env:COMPUTERNAME*.cab" -Force | Out-Null
+
+	# Redact potentially sensitive information that is not useful for troubleshooting before exporting as plaintext
+	$LicenseXML.DiagReport.LicensingData.OA3ProductKey = "Redacted"
+	$LicenseXML.DiagReport.GenuineAuthz.ServerProps    = "Redacted"
+	$LicenseXML.DiagReport.ChildNodes | Out-File -FilePath $LicenseFile
 }
 
-# Wait if elevated.ps1 has not finished, kill the script if timeout is reached
-If ( $ElevatedScript -ne $null ) {
-
-	Wait-Process -ProcessObject $ElevatedScript -ProcessName "elevated script" -TimeoutSeconds 120 -LogPath $Log
+Else
+{
+	Write-Warning "$LicenseFileTemp does not exist."
 }
 
-# Move log into $Path if it is not empty
-If ( $(Test-Path -Path $Log) -eq "True" -and (Get-Item $Log).Length -gt 0 ) {
+# Wait for dxdiag.exe to finish
+If ( $DxDiag -ne $null )
+{
+	Wait-Process -ProcessObject $DxDiag -ProcessName "dxdiag.exe" -TimeoutSeconds $DxDiagTimeout -DestinationPath $DxDiagFile
+}
 
-    Move-Item -Path $Log -Destination $Path
+# Wait for driverquery.exe to finish
+If ( $DxDiag -ne $null )
+{
+	Wait-Process -ProcessObject $DriverQuery -ProcessName "driverquery.exe" -TimeoutSeconds $DriverQueryTimeout
+}
+
+# Wait for msinfo32.exe to finish
+If ( $MsInfo32 -ne $null )
+{
+	Wait-Process -ProcessObject $MsInfo32 -ProcessName "msinfo32.exe" -TimeoutSeconds $MsInfo32Timeout -DestinationPath $SystemInfo
+}
+
+# Check that the msinfo32.nfo file was created, msinfo32.exe return an exit code of 0 regardless of whether or not it ran into an error, so this check is necessary.
+$SystemInfoExists = Test-Path -Path $SystemInfo
+
+If ( !$SystemInfoExists  )
+{
+	Write-Warning "$SystemInfo not found, msinfo32 may have crashed or was canceled by the user."
+}
+
+# Wait for elevated.ps1 to finish
+If ( $ElevatedScript -ne $null )
+{
+	Wait-Process -ProcessObject $ElevatedScript -ProcessName "elevated script" -TimeoutSeconds $ElevatedScriptTimeout
+}
+
+# Stop transcript since the file will be need to be moved into the output folder
+Stop-Transcript | Out-Null
+
+# Move transcript $Path if it is not empty
+If ( Test-Path -Path $Transcript )
+{
+    Move-Item -Path $Transcript -Destination $Path -Force
 }
 
 # Get hash of files to later check for corruption
 $FileName = @{Name="FileName";Expression={Split-Path $_.Path -Leaf}}
+Get-ChildItem -Path $Path -Recurse -Exclude "*.wer" | Get-FileHash -Algorithm SHA256 | Select-Object $FileName, Hash, Algorithm | Sort-Object FileName | Format-Table -AutoSize | Out-File -FilePath $FileHashes
 
-If ( $WindowsVersion -ge "6.3" ) {
-
-    Get-ChildItem -Path $Path -Recurse -Exclude "*.wer" | Get-FileHash -Algorithm SHA256 | Select-Object $FileName, Hash, Algorithm | Sort-Object FileName | Format-Table -AutoSize | Out-File -FilePath "$env:LOCALAPPDATA\hashes.txt"
-}
-
-If ( Test-Path -Path "$env:LOCALAPPDATA\hashes.txt" ) {
-
-    Move-Item -Path "$env:LOCALAPPDATA\hashes.txt" -Destination $Path
+If ( Test-Path -Path $FileHashes )
+{
+    Move-Item -Path $FileHashes -Destination $Path
 }
 
 # Compress output folder
-$CompressionResult = Compress-Folder -InputPath $Path -OutputPath $Zip -CompressionScriptPath "$ScriptPath\compression.vbs" -LogPath $Log
+$CompressionResult = Compress-Folder -Path $Path -DestinationPath $Zip
 
 # Check that the .zip file was created and the compression operation completed successfully before removing the uncompressed directory
 Write-Host "`n"
 
-If ( $(Test-Path -Path $Zip) -eq "True" -and $CompressionResult -eq "True" ) {
+$ZipExists = Test-Path -Path $Zip
 
-    Remove-Item -Path $Path -Recurse -Force | Out-Null
-    Write-Host "Output location: $Zip" 
+If ( $ZipExists -eq "True" -and $CompressionResult -eq "True" )
+{
+
+	# Check that $Zip is not empty
+	$ZipSize = (Get-Item -Path $Zip).Length
+
+	If ( $ZipSize -gt 1 )
+	{
+		Remove-Item -Path $Path -Recurse -Force | Out-Null
+		Write-Host "Output location: $Zip"
+	}
+	
+	Else
+	{
+	    Write-Warning "Compression failed, $Zip is empty."
+		Write-Host "`n"
+		Write-Host "Output location: $Path"
+	}
 }
 
-Else {
-
-    Write-Host "Compression failed!"
+Else
+{
+    Write-Warning "Compression failed!"
     Write-Host "`n"
     Write-Host "Output location: $Path"
-}
-
-If ( Test-Path -Path $ErrorFile ) { 
-
-	Remove-Item -Path $ErrorFile -Force | Out-Null
 }
 
 Write-Host "`n"
