@@ -1,3 +1,6 @@
+# This is used instead of the built-in "Compress-Archive" cmdlet for serveral reasons
+# 1. Using .NET results in faster compression
+# 2. Windows 8.1/Server 2012R2 does not have that cmdlet by default, since they ship with PowerShell 4.0
 Function Compress-Folder
 {
 	Param
@@ -14,9 +17,9 @@ Function Compress-Folder
 
 	Try
 	{
-		Add-Type -Assembly "system.io.compression.filesystem"
+		Add-Type -Assembly "System.IO.Compression.Filesystem"
 		Write-Host "Compressing folder..."
-		[io.compression.zipfile]::CreateFromDirectory("$Path","$DestinationPath")
+		[IO.Compression.ZipFile]::CreateFromDirectory("$Path","$DestinationPath")
 		Return $?
 	}
 
@@ -137,7 +140,7 @@ Function Wait-Process
 	}
 }
 
-# Get RAM information
+# Get RAM information, decoding SMBIOS values into human-readable output
 Function Get-MemoryInfo
 {
 	# Official SMBIOS documentation: https://www.dmtf.org/sites/default/files/standards/documents/DSP0134_3.0.0.pdf (page 93)
@@ -474,6 +477,36 @@ Function Get-FullCrashDumps
 	}
 }
 
+Function Get-CrashDumpSettings
+{
+	Param
+	(
+		[Parameter(Mandatory=$True)]
+		[string]
+		$DestinationPath
+	)
+	
+	$CrashDumpSettings = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
+
+	Write-Host "Getting crash dump settings..."
+	Write-Output "########################## Crash Dump Settings #########################" | Out-File -FilePath $DestinationPath
+	Get-ItemProperty -Path $CrashDumpSettings | Out-File -Append -FilePath $DestinationPath
+
+	$CrashDumpMatrix =
+"
+######################## Crash Dump Type Matrix ########################`r`n`r`n`r`n
+`t`tCrashDumpEnabled`t`t`tFilterPages`r`n
+Disabled`t0`t`t`t`t`t<does not exist>`r`n
+Complete`t1`t`t`t`t`t<does not exist>`r`n
+Active`t`t1`t`t`t`t`t1`r`n
+Kernel`t`t2`t`t`t`t`t<does not exist>`r`n
+Small`t`t3`t`t`t`t`t<does not exist>`r`n
+Automatic`t7`t`t`t`t`t<does not exist>
+"
+
+	Write-Output $CrashDumpMatrix | Out-File -Append -FilePath $DestinationPath
+}
+
 # Download specified remote file
 Function Get-RemoteFile
 {
@@ -513,34 +546,4 @@ Function Get-RemoteFile
 			Remove-Item -Path $DestinationPath -Force | Out-Null
 		}
 	}
-}
-
-Function Get-CrashDumpSettings
-{
-	Param
-	(
-		[Parameter(Mandatory=$True)]
-		[string]
-		$DestinationPath
-	)
-	
-	$CrashDumpSettings = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
-
-	Write-Host "Getting crash dump settings..."
-	Write-Output "########################## Crash Dump Settings #########################" | Out-File -FilePath $DestinationPath
-	Get-ItemProperty -Path $CrashDumpSettings | Out-File -Append -FilePath $DestinationPath
-
-	$CrashDumpMatrix =
-"
-######################## Crash Dump Type Matrix ########################`r`n`r`n`r`n
-`t`tCrashDumpEnabled`t`t`tFilterPages`r`n
-Disabled`t0`t`t`t`t`t<does not exist>`r`n
-Complete`t1`t`t`t`t`t<does not exist>`r`n
-Active`t`t1`t`t`t`t`t1`r`n
-Kernel`t`t2`t`t`t`t`t<does not exist>`r`n
-Small`t`t3`t`t`t`t`t<does not exist>`r`n
-Automatic`t7`t`t`t`t`t<does not exist>
-"
-
-	Write-Output $CrashDumpMatrix | Out-File -Append -FilePath $DestinationPath
 }
