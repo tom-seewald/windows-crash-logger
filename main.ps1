@@ -3,7 +3,7 @@
 ##############################
 
 # Version String
-$ScriptVersion = "Beta12 - 7/28/18"
+$ScriptVersion = "Beta13 - 7/28/18"
 
 # Detect Windows version
 $WindowsBuild  = [System.Environment]::OSVersion.Version.Build
@@ -80,7 +80,6 @@ $PowerReports = Join-Path -Path $Path -ChildPath "Power Reports"
 
 # Output files
 $AppEvents         = Join-Path -Path $EventLogs -ChildPath "application-events.txt"
-$BIOS              = Join-Path -Path $Path -ChildPath "bios.txt"
 $CPU               = Join-Path -Path $Path -ChildPath "cpu.txt"
 $DriverTable       = Join-Path -Path $Path -ChildPath "driver-table.txt"
 $DriverVersions    = Join-Path -Path $Path -ChildPath "driver-versions.txt"
@@ -116,7 +115,7 @@ $UserSoftware        = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstal
 $HostsFile = Join-Path $env:SystemRoot -ChildPath "System32\drivers\etc\hosts"
 $System32  = Join-Path -Path $env:SystemRoot -ChildPath "System32"
 
-# Full paths of executables used in this script, in case the system's path environment variables have been messed with
+# Full paths of executables used in this script, in case the system's environment variables have been messed with
 $DriverQueryPath = Join-Path -Path $System32 -ChildPath "driverquery.exe"
 $DXDiagPath      = Join-Path -Path $System32 -ChildPath "dxdiag.exe"
 $IpconfigPath    = Join-Path -Path $System32 -ChildPath "ipconfig.exe"
@@ -298,12 +297,14 @@ $ProcessorAttributes = "Name", "Description", "Manufacturer", "DeviceID", "Socke
 Get-CimInstance -ClassName Win32_Processor | Select-Object $ProcessorAttributes | Format-List | Out-File -FilePath $CPU
 
 # System Board information
+Write-Output "Motherboard Details" | Out-File -Append -FilePath $Motherboard
 $BaseBoardAttributes = "Product", "Model", "Version", "Manufacturer", "Description"
-Get-CimInstance -ClassName Win32_BaseBoard | Select-Object $BaseBoardAttributes | Format-List | Out-File -FilePath $Motherboard
+Get-CimInstance -ClassName Win32_BaseBoard | Select-Object $BaseBoardAttributes | Format-List | Out-File -Append -FilePath $Motherboard
 
 # UEFI/BIOS properties
+Write-Output "UEFI/BIOS Details" | Out-File -Append -FilePath $Motherboard
 $BiosAttributes = "SMBIOSBIOSVersion", "Manufacturer", "Name", "Version", "BIOSVersion", "ReleaseDate"
-Get-CimInstance -ClassName Win32_Bios | Select-Object $BiosAttributes | Format-List | Out-File -Append -FilePath $BIOS
+Get-CimInstance -ClassName Win32_Bios | Select-Object $BiosAttributes | Format-List | Out-File -Append -FilePath $Motherboard
 
 # GPU information
 $GpuAttributes = "Name", "DeviceID", "PNPDeviceID", "VideoProcessor", "CurrentRefreshRate", "VideoModeDescription", "AdapterRAM", `
@@ -359,7 +360,7 @@ If ( $LicenseDiag -ne $null )
 	Wait-Process -ProcessObject $LicenseDiag -ProcessName "licensingdiag.exe" -TimeoutSeconds $LicenseTimeout -DestinationPath $LicenseFileTemp
 }
 
-# Now that we know licensingdiag.exe has finished, attempt to process the xml file, redact the license key, and export from xml to flat text
+# Now that licensingdiag.exe has finished, attempt to process the xml file, redact the license key, and export from xml to flat text
 Write-Host "Creating Windows license report..."
 If ( Test-Path -Path $LicenseFileTemp )
 {
@@ -398,7 +399,7 @@ If ( $MsInfo32 -ne $null )
 	Wait-Process -ProcessObject $MsInfo32 -ProcessName "msinfo32.exe" -TimeoutSeconds $MsInfo32Timeout -DestinationPath $SystemInfo
 }
 
-# Check that the msinfo32.nfo file was created, msinfo32.exe return an exit code of 0 regardless of whether or not it ran into an error, so this check is necessary.
+# Check that the msinfo32.nfo file was created, msinfo32.exe returns an exit code of 0 regardless of whether or not it ran into an error, so this check is necessary.
 $SystemInfoExists = Test-Path -Path $SystemInfo
 
 If ( !$SystemInfoExists  )
@@ -421,7 +422,7 @@ If ( Test-Path -Path $Transcript )
     Move-Item -Path $Transcript -Destination $Path -Force
 }
 
-# Get hash of files to later check for corruption
+# Get hash of files to later check for corruption, we skip .wer files as there can be hundreds of them which can take an excessive amount of time to hash
 $FileName = @{Name="FileName";Expression={Split-Path $_.Path -Leaf}}
 Get-ChildItem -Path $Path -Recurse -Exclude "*.wer" | Get-FileHash -Algorithm SHA256 | Select-Object $FileName, Hash, Algorithm | Sort-Object FileName | Format-Table -AutoSize | Out-File -FilePath $FileHashes
 
@@ -441,7 +442,7 @@ $ZipExists = Test-Path -Path $Zip
 If ( $ZipExists -eq "True" -and $CompressionResult -eq "True" )
 {
 
-	# Check that $Zip is not empty
+	# Check that $Zip is not empty before declaring compression succeeded
 	$ZipSize = (Get-Item -Path $Zip).Length
 
 	If ( $ZipSize -gt 1 )
