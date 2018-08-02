@@ -18,7 +18,7 @@ Function Compress-Folder
 	Try
 	{
 		Add-Type -Assembly "System.IO.Compression.Filesystem"
-		Write-Host "Compressing folder..."
+		Write-Output "Compressing folder..."
 		[IO.Compression.ZipFile]::CreateFromDirectory("$Path","$DestinationPath")
 		Return $?
 	}
@@ -34,6 +34,7 @@ Function Compress-Folder
 	}
 }
 
+# Allows us to map drive letters to disk paths in the NT Object Manager namespace
 Function Import-DriveInformation
 {
 $DiskInfoCode =
@@ -116,7 +117,7 @@ Function Wait-Process
 
 	If ( !$ProcessObject.HasExited )
 	{
-		Write-Host "Waiting for $ProcessName to finish..."
+		Write-Output "Waiting for $ProcessName to finish..."
 	}
 
 	While ( !$ProcessObject.HasExited -and $StartTime.AddSeconds($TimeoutSeconds) -gt (Get-Date) )
@@ -140,7 +141,7 @@ Function Wait-Process
 	}
 }
 
-# Get RAM information, decoding SMBIOS values into human-readable output
+# Get RAM information, decode SMBIOS values into human-readable output
 Function Get-MemoryInfo
 {
 	# Official SMBIOS documentation: https://www.dmtf.org/sites/default/files/standards/documents/DSP0134_3.0.0.pdf (page 93)
@@ -315,7 +316,8 @@ Function Get-MemoryInfo
 	}
 }
 
-Function Copy-CrashDumps
+# Copy the last N mini crash dumps, check both the standard path and the registry to see if there was an alternate path specified
+Function Copy-MiniCrashDumps
 {
 	Param
 	(
@@ -324,96 +326,73 @@ Function Copy-CrashDumps
 		[string]
 		$DestinationPath
 	)
+	
+	# Only copy at most the 10 most recent minidumps, in the event both $MinidumpPath and $DefaultPath have 5 minidumps.
+	$CrashesToCollect = 5
 
-	$MinidumpPath   = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl").MinidumpDir
+	$CrashSettings  = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
+	$MinidumpPath   = (Get-ItemProperty -Path $CrashSettings).MinidumpDir
 	$DefaultPath    = Join-Path -Path $env:SystemRoot -ChildPath "Minidump"
 	$MiniDumpReport = Join-Path -Path $DestinationPath -ChildPath "mini-crash-dumps.txt"
 
-	If ( $DefaultPath -eq $MinidumpPath )
+	# Always look where the registry points to for minidumps
+	If ( Test-Path -Path $MinidumpPath )
 	{
-		If ( Test-Path -Path $MinidumpPath )
+		Get-ChildItem -Path $MinidumpPath | Sort-Object LastWriteTime -Descending | Out-File -Append -FilePath $MiniDumpReport
+
+		$MiniDumpPathContents = Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath
+
+		If ( $MiniDumpPathContents -ne $null )
 		{
-			Get-ChildItem $MinidumpPath | Sort-Object LastWriteTime -Descending | Out-File -Append -FilePath $MiniDumpReport
-
-			$MiniDumpPathContents = Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath
-
-			If ( $MiniDumpPathContents -ne $null )
-			{
-				Write-Host "Copying crash dumps from $MinidumpPath..."
-				Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$CrashDumps" } -ErrorAction SilentlyContinue
-			}
-
-			Else
-			{
-				Write-Host "No crash dumps to copy from $MinidumpPath"
-				Write-Output "$MinidumpPath contains no dump files." | Out-File -Append -FilePath $MiniDumpReport
-			}
+			Write-Output "Copying crash dumps from $MinidumpPath..."
+			Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First $CrashesToCollect | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$CrashDumps" } -ErrorAction SilentlyContinue
 		}
 
 		Else
 		{
-			Write-Host "No crash dumps to copy from $MinidumpPath"
-			Write-Output "$MinidumpPath does not exist." | Out-File -Append -FilePath $MiniDumpReport
+			Write-Output "No crash dumps to copy from $MinidumpPath"
+			Write-Output "$MinidumpPath contains no dump files." | Out-File -Append -FilePath $MiniDumpReport
 		}
 	}
 
-	# If they paths in the registry and the default minidump path differ, check both paths for crash dumps and copy the 5 newest
 	Else
 	{
-		# Check that the registry path exists and is not empty, copy the 5 newest crash dumps
-		If ( Test-Path -Path $MinidumpPath )
-		{
-			Get-ChildItem $MinidumpPath | Sort-Object LastWriteTime -Descending | Out-File -Append -FilePath $MiniDumpReport
+		Write-Output "No crash dumps to copy from $MinidumpPath"
+		Write-Output "$MinidumpPath does not exist." | Out-File -Append -FilePath $MiniDumpReport
+	}
 
-			$MiniDumpPathContents = Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath
-
-			If ( $MiniDumpPathContents -ne $null )
-			{
-				Write-Host "Copying crash dumps from $MinidumpPath..."
-				Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination $DestinationPath }
-			}
-
-			Else
-			{
-				Write-Host "No crash dumps to copy from $MinidumpPath"
-				Write-Output "$MinidumpPath contains no dump files." | Out-File -Append -FilePath $MiniDumpReport
-			}
-		}
-
-		Else
-		{
-			Write-Host "No crash dumps to copy from $MinidumpPath"
-			Write-Output "$MinidumpPath does not exist." | Out-File -Append -FilePath $MiniDumpReport
-		}
-
+	# If they path in the registry and the default minidump path differ, also check the default path for crash dumps.
+	If ( $DefaultPath -ne $MinidumpPath )
+	{
 		If ( Test-Path -Path $DefaultPath )
 		{
-			Get-ChildItem $DefaultPath | Sort-Object LastWriteTime -Descending | Out-File -Append -FilePath $MiniDumpReport
+			Get-ChildItem -Path $DefaultPath | Sort-Object LastWriteTime -Descending | Out-File -Append -FilePath $MiniDumpReport
 
 			$DefaultPathContents = Get-ChildItem -Filter "*.dmp" -Path $DefaultPath
 
 			If ( $DefaultPathContents -ne $null )
 			{
-				Write-Host "Copying crash dumps from $DefaultPath..."
-				Get-ChildItem -Filter "*.dmp" -Path $DefaultPath  | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First 5 | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$CrashDumps" }
+				Write-Output "Copying crash dumps from $DefaultPath..."
+				Get-ChildItem -Filter "*.dmp" -Path $DefaultPath  | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First $CrashesToCollect | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$CrashDumps" }
 			}
 
 			Else
 			{
-				Write-Host "No crash dumps to copy from $DefaultPath"
+				Write-Output "No crash dumps to copy from $DefaultPath"
 				Write-Output "$DefaultPath contains no dump files." | Out-File -Append -FilePath $MiniDumpReport
 			}
 		}
 
 		Else
 		{
-			Write-Host "No crash dumps to copy from $DefaultPath"
+			Write-Output "No crash dumps to copy from $DefaultPath"
 			Write-Output "$DefaultPath does not exist." | Out-File -Append -FilePath $MiniDumpReport
 		}
 	}
 }
 
-Function Get-FullCrashDumps
+# Gather information about full memory dumps that exist on the system
+Function Get-FullCrashDumpInfo
 {
 	Param
 	(
@@ -423,56 +402,39 @@ Function Get-FullCrashDumps
 		$DestinationPath
 	)
 	
-	$DumpPath         = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl").DumpFile
-	$FullMemoryDump   = Join-Path -Path $env:SystemRoot -ChildPath "Memory.dmp"
+	$CrashSettings    = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
+	$DumpPath         = (Get-ItemProperty -Path $CrashSettings).DumpFile
+	$DefaultPath      = Join-Path -Path $env:SystemRoot -ChildPath "Memory.dmp"
 	$MemoryDumpReport = Join-Path -Path $DestinationPath -ChildPath "memory-dumps.txt"
 	
-	If ( $DumpPath -eq $FullMemoryDump )
+	If ( Test-Path -Path $DumpPath )
 	{
-		If ( Test-Path -Path $DumpPath )
-		{
-			$FullMemoryDumpProperties = $(Get-Item -Path $FullMemoryDump)
-			
-			Write-Output "Crash dump found at $FullMemoryDump" | Out-File -Append -FilePath $MemoryDumpReport
-			Write-Output "Creation date: $((Get-Item -Path $FullMemoryDump).LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
-			Write-Output "Size on disk: $([math]::truncate($FullMemoryDumpProperties.Length / 1MB)) MB" | Out-File -Append -FilePath $MemoryDumpReport
-		}
-
-		Else
-		{
-			Write-Output "$DumpPath was not found" | Out-File -Append -FilePath $MemoryDumpReport
-		}
+		$DumpPathProperties = $(Get-Item -Path $DumpPath)
+		
+		Write-Output "Crash dump found at $DumpPath" | Out-File -Append -FilePath $MemoryDumpReport
+		Write-Output "Creation date: $((Get-Item -Path $DumpPath).LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
+		Write-Output "Size on disk: $([math]::round($DumpPathProperties.Length / 1MB)) MB" | Out-File -Append -FilePath $MemoryDumpReport
 	}
 
 	Else
 	{
-		If ( Test-Path -Path $DumpPath )
+		Write-Output "$DumpPath was not found" | Out-File -Append -FilePath $MemoryDumpReport
+	}
+
+	If ( $DumpPath -ne $DefaultPath )
+	{
+		If ( Test-Path -Path $DefaultPath )
 		{
-		
-			$DumpPathProperties = Get-Item -Path $DumpPath
+			$DefaultPathProperties = Get-Item -Path $DefaultPath
 			
-			Write-Output "Crash dump found at $DumpPath" | Out-File -FilePath  $MemoryDumpReport
-			Write-Output "Creation date: $((Get-Item -Path $DumpPath).LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
-			Write-Output "Size on disk: $([math]::truncate($DumpPathProperties.Length / 1MB)) MB" | Out-File -Append -FilePath $MemoryDumpReport
+			Write-Output "Crash dump found at $DefaultPath" | Out-File -Append -FilePath $MemoryDumpReport
+			Write-Output "Creation date: $((Get-Item -Path $DefaultPath).LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
+			Write-Output "Size on disk: $([math]::round($DefaultPathProperties.Length / 1MB)) MB" | Out-File -Append -FilePath $MemoryDumpReport
 		}
 
 		Else
 		{
-			Write-Output "$DumpPath was not found" | Out-File -Append -FilePath $MemoryDumpReport
-		}
-
-		If ( Test-Path -Path $FullMemoryDump )
-		{
-			$FullMemoryDumpProperties = Get-Item -Path $FullMemoryDump
-			
-			Write-Output "Crash dump found at $FullMemoryDump" | Out-File -Append -FilePath $MemoryDumpReport
-			Write-Output "Creation date: $((Get-Item -Path $FullMemoryDump).LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
-			Write-Output "Size on disk: $([math]::truncate($FullMemoryDumpProperties.Length / 1MB)) MB" | Out-File -Append -FilePath $MemoryDumpReport
-		}
-
-		Else
-		{
-			Write-Output "$FullMemoryDump was not found" | Out-File -Append -FilePath $MemoryDumpReport
+			Write-Output "$DefaultPath was not found" | Out-File -Append -FilePath $MemoryDumpReport
 		}
 	}
 }
@@ -486,11 +448,11 @@ Function Get-CrashDumpSettings
 		$DestinationPath
 	)
 	
-	$CrashDumpSettings = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
+	$CrashSettings = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
 
-	Write-Host "Getting crash dump settings..."
+	Write-Output "Getting crash dump settings..."
 	Write-Output "########################## Crash Dump Settings #########################" | Out-File -FilePath $DestinationPath
-	Get-ItemProperty -Path $CrashDumpSettings | Out-File -Append -FilePath $DestinationPath
+	Get-ItemProperty -Path $CrashSettings | Out-File -Append -FilePath $DestinationPath
 
 	$CrashDumpMatrix =
 "
@@ -507,7 +469,7 @@ Automatic`t7`t`t`t`t`t<does not exist>
 	Write-Output $CrashDumpMatrix | Out-File -Append -FilePath $DestinationPath
 }
 
-# Download specified remote file
+# Download specified remote file with timeout and error handling
 Function Get-RemoteFile
 {
     Param
@@ -526,12 +488,12 @@ Function Get-RemoteFile
 
 	$TimeoutSec = 10
 
-    Write-Host "Downloading $FileName..."
+    Write-Output "Downloading $FileName..."
 
 	Try
 	{
 		# This removes the progress bar, which slows the download to a crawl if enabled
-		$ProgressPreference = 'SilentlyContinue'
+		$ProgressPreference = "SilentlyContinue"
 		Invoke-WebRequest -Uri $URL -OutFile $DestinationPath -TimeoutSec $TimeoutSec
 	}
 

@@ -3,12 +3,11 @@
 ##############################
 
 # Version String
-$ScriptVersion = "Beta13 - 7/28/18"
+$ScriptVersion = "Beta14 - 7/30/18"
 
 # Detect Windows version
 $WindowsBuild  = [System.Environment]::OSVersion.Version.Build
 $Win1709Build  = 16299
-$Win10MinBuild = 10240
 $Win81Build    = 9600
 
 # Check if we are running PowerShell Core, and relaunch with native PowerShell if possible.  
@@ -24,24 +23,24 @@ If ( $WindowsBuild -ge $Win1709Build )
 	If ( (Get-MpPreference).EnableControlledFolderAccess -eq 1 )
 	{
 		Write-Warning "Controlled Folder Access is enabled in Windows Defender, this prevents the script from placing log files on your Desktop."
-		Write-Host "`n"
+		Write-Output "`n"
 		Write-Warning "If you would like allow this script to run, please temporarily disable Controlled Folder Access in Windows Defender Security Center and then re-launch this script."
-		Write-Host "`n"
+		Write-Output "`n"
 		Read-Host -Prompt "Press Enter to close this window"
-		Exit
+		Stop-Process -ID $PID | Out-Null
 	}
 }
 
 # If the OS is 64-bit and this script was launched with 32-bit PowerShell, relaunch with 64-bit PowerShell and Exit the current instance
 If ( [Environment]::Is64BitOperatingSystem -eq $True -and [Environment]::Is64BitProcess -eq $False )
 {
-	&"$env:SystemRoot\sysnative\windowspowershell\v1.0\powershell.exe" -NoProfile $myInvocation.InvocationName
-	Exit
+	&"$env:SystemRoot\sysnative\windowspowershell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -NoExit -File $myInvocation.InvocationName
+	Stop-Process -ID $PID | Out-Null
 }
 
 # Startup Banner
 Clear-Host
-Write-Host "
+Write-Output "
   ______              ______                          _              
  /_  __/__  ____     / ____/___  _______  __________ ( )_____        
   / / / _ \/ __ \   / /_  / __ \/ ___/ / / / __  __ \|// ___/        
@@ -56,7 +55,7 @@ Write-Host "
 "
 
 "`n" * 3
-Write-Host $ScriptVersion
+Write-Output $ScriptVersion
 "`n" * 3
 
 Read-Host -Prompt "Press Enter to continue"
@@ -185,7 +184,7 @@ If ( $WindowsBuild -lt $Win81Build )
 }
 
 # Generate System Information Report
-Write-Host "Generating system information report, this may take a while..."
+Write-Output "Generating system information report, this may take a while..."
 
 Try
 {
@@ -204,12 +203,12 @@ Get-RemoteFile -URL $AutorunsURL -FileName "autorunsc" -DestinationPath $Autorun
 # Start elevated.ps1
 If ( Test-Path -Path $ElevatedScriptPath )
 {
-	Write-Host "Launching elevated script..."
+	Write-Output "Launching elevated script..."
 
 	Try
 	{
 		$ElevatedScript = Start-Process -FilePath $PowerShellPath `
-										-ArgumentList """-ExecutionPolicy"" ""Bypass"" ""-NonInteractive"" ""-NoProfile"" ""-File"" ""$ElevatedScriptPath"" ""$Path""" `
+										-ArgumentList """-ExecutionPolicy"" ""Bypass"" ""-NonInteractive"" ""-NoProfile"" ""-NoExit"" ""-File"" ""$ElevatedScriptPath"" ""$Path""" `
 										-Verb RunAs `
 										-PassThru
 	}
@@ -227,7 +226,7 @@ Else
 }
 
 # Start DirectX Diagnostics Report
-Write-Host "Running DirectX diagnostics..."
+Write-Output "Running DirectX diagnostics..."
 
 Try
 {
@@ -265,29 +264,29 @@ Catch
 }
 
 # Export Event Logs (2592000000 ms = 30 days)
-Write-Host "Exporting Application event Log..."
+Write-Output "Exporting Application event Log..."
 &$WevtUtilPath query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text | Out-File -FilePath $AppEvents 2> $null
 
-Write-Host "Exporting System event log..."
+Write-Output "Exporting System event log..."
 &$WevtUtilPath query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text | Out-File -FilePath $SystemEvents 2> $null
 
-Write-Host "Exporting Kernel PnP event log..."
+Write-Output "Exporting Kernel PnP event log..."
 &$WevtUtilPath query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text | Out-File -FilePath $PnPEvents 2> $null
 
 # OS details
 Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object Name, Version, BuildNumber, OSArchitecture, LocalDateTime, LastBootUpTime, InstallDate, BootDevice, SystemDevice | Out-File -FilePath $OSDetails
 
 # Driver information
-Write-Host "Gathering device driver information..."
+Write-Output "Gathering device driver information..."
 $DriverInfoAttributes = "DeviceName", "FriendlyName", "InfName", "DriverVersion", "IsSigned", "DriverDate"
 Get-CimInstance -ClassName Win32_PnPSignedDriver | Select-Object -Property $DriverInfoAttributes | Sort-Object DeviceName | Format-Table -AutoSize | Out-File -FilePath $DriverVersions
 
 # Get default power plan
-Write-Host "Checking power settings..."
+Write-Output "Checking power settings..."
 &$PowerCfgPath /list 2> $null | Out-File -FilePath $PowerPlan
 
 # RAM info
-Write-Host "Getting hardware information..."
+Write-Output "Getting hardware information..."
 Get-MemoryInfo | Out-File -FilePath $RAM
 
 # Processor information
@@ -313,7 +312,7 @@ $GpuAttributes = "Name", "DeviceID", "PNPDeviceID", "VideoProcessor", "CurrentRe
 Get-CimInstance -ClassName Win32_VideoController | Select-Object $GpuAttributes | Format-List | Out-File -FilePath $GPU
 
 # Installed software, first check native and then 32-bit (if it exists).
-Write-Host "Listing installed software..."
+Write-Output "Listing installed software..."
 
 $SoftwareAttributes = "DisplayName", "DisplayVersion", "Publisher", "InstallDate"
 Get-ItemProperty -Path "$NativeSoftware\*" | Select-Object $SoftwareAttributes | `
@@ -333,16 +332,16 @@ Write-Output "Installed Windows Components" | Out-File -Append -FilePath $Instal
 Get-ItemProperty "$InstalledComponents\*" | Select-Object "(Default)", ComponentID, Version, Enabled | Where-Object {$_."(Default)" -ne $null -or $_.ComponentID -ne $null} | Sort-Object "(default)" | Format-Table -AutoSize | Out-File -Append -FilePath $InstalledSoftware
 
 # Installed Windows Updates
-Write-Host "Listing installed Windows updates..."
+Write-Output "Listing installed Windows updates..."
 Get-CimInstance -ClassName Win32_QuickFixEngineering | Select-Object HotFixID,Description,InstalledOn | Sort-Object InstalledOn,HotFixID | Format-Table -AutoSize | Out-File -FilePath $WindowsUpdates
 
 # Basic networking information
-Write-Host "Finding network information..."
+Write-Output "Finding network information..."
 &$IpconfigPath /allcompartments /all 2> $null | Select-Object -Skip 1 | Out-File -FilePath $NetworkInfo
 &$RoutePath print | Out-File -Append -FilePath $NetworkInfo 2> $null
 
 # Copy relevant entries from the hosts file
-Write-Host "Examining hosts file..."
+Write-Output "Examining hosts file..."
 
 If ( Test-Path -Path $HostsFile )
 {
@@ -361,7 +360,7 @@ If ( $LicenseDiag -ne $null )
 }
 
 # Now that licensingdiag.exe has finished, attempt to process the xml file, redact the license key, and export from xml to flat text
-Write-Host "Creating Windows license report..."
+Write-Output "Creating Windows license report..."
 If ( Test-Path -Path $LicenseFileTemp )
 {
 	[xml] $LicenseXML = Get-Content -Path $LicenseFileTemp
@@ -416,7 +415,7 @@ If ( $ElevatedScript -ne $null )
 # Stop transcript since the file will be need to be moved into the output folder
 Stop-Transcript | Out-Null
 
-# Move transcript $Path if it is not empty
+# Move transcript to $Path
 If ( Test-Path -Path $Transcript )
 {
     Move-Item -Path $Transcript -Destination $Path -Force
@@ -432,10 +431,11 @@ If ( Test-Path -Path $FileHashes )
 }
 
 # Compress output folder
+Write-Output "Compressing folder..."
 $CompressionResult = Compress-Folder -Path $Path -DestinationPath $Zip
 
 # Check that the .zip file was created and the compression operation completed successfully before removing the uncompressed directory
-Write-Host "`n"
+Write-Output "`n"
 
 $ZipExists = Test-Path -Path $Zip
 
@@ -448,23 +448,26 @@ If ( $ZipExists -eq "True" -and $CompressionResult -eq "True" )
 	If ( $ZipSize -gt 1 )
 	{
 		Remove-Item -Path $Path -Recurse -Force | Out-Null
-		Write-Host "Output location: $Zip"
+		Write-Output "Output location: $Zip"
 	}
 	
 	Else
 	{
 	    Write-Warning "Compression failed, $Zip is empty."
-		Write-Host "`n"
-		Write-Host "Output location: $Path"
+		Write-Output "`n"
+		Write-Output "Output location: $Path"
 	}
 }
 
 Else
 {
     Write-Warning "Compression failed!"
-    Write-Host "`n"
-    Write-Host "Output location: $Path"
+    Write-Output "`n"
+    Write-Output "Output location: $Path"
 }
 
-Write-Host "`n"
+Write-Output "`n"
 Read-Host -Prompt "Press Enter to exit"
+
+# Stop script, it was launched with -NoExit so we must actually stop the process to close the Window
+Stop-Process -ID $PID | Out-Null

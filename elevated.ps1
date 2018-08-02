@@ -86,10 +86,10 @@ $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(1000,1000
 Get-CrashDumpSettings -DestinationPath $CrashDumpSettings
 
 # Copy mini crash dumps
-Copy-CrashDumps -DestinationPath $CrashDumps
+Copy-MiniCrashDumps -DestinationPath $CrashDumps
 
 # Check if a full/kernel/active memory dump exists in the default location and the one specified in the registry
-Get-FullCrashDumps -DestinationPath $CrashDumps
+Get-FullCrashDumpInfo -DestinationPath $CrashDumps
 
 # List contents of LiveKernelReports directory if it exists and is not empty
 If ( $(Test-Path -Path $KernelReportsPath) -eq $True -and $(Get-ChildItem -Path $KernelReportsPath ) -ne $null )
@@ -99,11 +99,11 @@ If ( $(Test-Path -Path $KernelReportsPath) -eq $True -and $(Get-ChildItem -Path 
 }
 
 # Gather a System Power Report, only supported on 8.1 and newer
-Write-Host "Running system power report..."
+Write-Output "Running system power report..."
 &$PowerCfgPath /sleepstudy /output $SleepStudy 2> $null| Out-Null
 
 # Run a sleep diagnostics report
-Write-Host "Running sleep diagostics..."
+Write-Output "Running sleep diagostics..."
 &$PowerCfgPath /systemsleepdiagnostics /output $SleepDiagnostics 2> $null | Out-Null
 
 # Disk and partition information
@@ -118,17 +118,17 @@ Get-Partition | Format-List | Out-File -Append -FilePath $Partitions
 Get-DiskInformation | Out-File -FilePath $Disks
 
 # List PnP devices and associated information
-Write-Host "Listing PnP devices..."
+Write-Output "Listing PnP devices..."
 $DriverAttributes = "Name", "Status", "ConfigManagerErrorCode", "Description", "Manufacturer", "DeviceID"
 Get-CimInstance -ClassName Win32_PNPEntity | Select-Object $DriverAttributes | Sort-Object Name | Format-Table -AutoSize | Out-File -Append -FilePath $PnPDevices
 
 # List all processes
-Write-Host "Enumerating running processes..."
+Write-Output "Enumerating running processes..."
 $ProcessAttributes = "ProcessName", "ProcessID", "SessionId", "Priority", "CommandLine"
 Get-CimInstance -ClassName Win32_Process | Select-Object $ProcessAttributes | Sort-Object ProcessName,ProcessId | Format-Table -AutoSize | Out-File -FilePath $Processes
 
 # List all services including status, pid, only Windows 10 has support for listing service StartType via Get-Service
-Write-Host "Identifying running services..."
+Write-Output "Identifying running services..."
 If ( $WindowsBuild -ge $Win10MinBuild )
 {
 	$StartType = @{Name="StartType";Expression={(Get-Service $_.Name).StartType}}
@@ -141,7 +141,7 @@ Else
 }
 
 # Copy Windows Error Reports
-Write-Host "Copying Windows error reports..."
+Write-Output "Copying Windows error reports..."
 If ( Test-Path -Path $LocalUserWER )
 {
 	Copy-Item "$LocalUserWER\*" -Destination $WER -Recurse -Container 2> $null | Out-Null
@@ -155,10 +155,24 @@ If ( Test-Path -Path $ProgramDataWER )
 # Find autostart entries, scheduled tasks etc. with Autorunsc.exe
 If ( Test-Path -Path $AutoRunsPath )
 {
-	Write-Host "Finding auto-start entries..."
+	Write-Output "Finding auto-start entries..."
 	# -s = Verify digital signatures, -m = List all autostart entries that are not cryptographically signed by Microsoft, -a = specify autostart selection, 
 	# b = boot execute, d = Appinit DLLs, e = explorer add-ons, h = image hijacks, l = logon, t = scheduled tasks, w = winlogon
-	Start-Process -FilePath $AutoRunsPath -ArgumentList "-accepteula","-nobanner","-s","-m","-a","bdehtw" -NoNewWindow -Wait -RedirectStandardOutput $AutorunsReport
+	
+	# Currently autorunsc version 13.90 has a bug where it crashes whenever it processes logon startup entries, hopefully this is fixed in the next release.
+	$AutoRunsVersion = (Get-Item -Path $AutoRunsPath).VersionInfo.ProductVersion
+	$BadVersion      = "13.90"
+	
+	If ( $AutoRunsVersion -eq $BadVersion )
+	{
+		Start-Process -FilePath $AutoRunsPath -ArgumentList "-accepteula","-nobanner","-s","-m","-a","bdehtw" -NoNewWindow -Wait -RedirectStandardOutput $AutoRunsReport
+		Get-CimInstance -ClassName Win32_StartupCommand | Select-Object Name, Command, Location | Format-List | Out-File -Append -FilePath $AutoRunsReport
+	}
+	
+	Else
+	{
+		Start-Process -FilePath $AutoRunsPath -ArgumentList "-accepteula","-nobanner","-s","-m","-a","bdehltw" -NoNewWindow -Wait -RedirectStandardOutput $AutoRunsReport
+	}
 }
 
 Else
@@ -179,10 +193,13 @@ If ( Test-Path -Path $Transcript )
 	# Allow transcript to be moved and read by standard users, otherwise hashing and compression may fail 
 	$TranscriptACL = Get-ACL -Path $Transcript
 	$TranscriptACL.SetAccessRuleProtection(1,0)
-	$NewAccessRule= New-Object System.Security.AccessControl.FileSystemAccessRule("everyone","full","none","none","Allow")
+	$NewAccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule("everyone","full","none","none","Allow")
 	$TranscriptACL.AddAccessRule($NewAccessRule)
 	Set-Acl -Path $Transcript -AclObject $TranscriptACL
 
-	# Move log into $Path
+	# Move transcript into $Path
 	Move-Item -Path $Transcript -Destination $Path -Force
 }
+
+# Stop script, it was launched with -NoExit so we must actually stop the process to close the Window
+Stop-Process -ID $PID | Out-Null
