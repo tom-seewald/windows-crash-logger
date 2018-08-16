@@ -3,7 +3,7 @@
 ##############################
 
 # Version String
-$ScriptVersion = "Beta14 - 7/30/18"
+$ScriptVersion = "Beta15 - 8/15/18"
 
 # Detect Windows version
 $WindowsBuild  = [System.Environment]::OSVersion.Version.Build
@@ -73,7 +73,8 @@ $LoggerModule       = Join-Path -Path $PSScriptRoot -ChildPath "logger-module.ps
 $Transcript = Join-Path $env:TEMP -ChildPath "transcript-main.txt"
 
 # Output folders
-$Path         = Join-Path -Path "$home\Desktop" -ChildPath $FolderName
+$Desktop      = [Environment]::GetFolderPath("Desktop")
+$Path         = Join-Path -Path $Desktop -ChildPath $FolderName
 $EventLogs    = Join-Path -Path $Path -ChildPath "Event Logs"
 $PowerReports = Join-Path -Path $Path -ChildPath "Power Reports"
 

@@ -103,7 +103,7 @@ Write-Output "Running system power report..."
 &$PowerCfgPath /sleepstudy /output $SleepStudy 2> $null| Out-Null
 
 # Run a sleep diagnostics report
-Write-Output "Running sleep diagostics..."
+Write-Output "Running sleep diagnostics..."
 &$PowerCfgPath /systemsleepdiagnostics /output $SleepDiagnostics 2> $null | Out-Null
 
 # Disk and partition information
