@@ -3,7 +3,7 @@
 ##############################
 
 # Version String
-$ScriptVersion = "Beta15 - 8/15/18"
+$ScriptVersion = "Beta16 - 9/15/18"
 
 # Detect Windows version
 $WindowsBuild  = [System.Environment]::OSVersion.Version.Build
@@ -31,7 +31,7 @@ If ( $WindowsBuild -ge $Win1709Build )
 	}
 }
 
-# If the OS is 64-bit and this script was launched with 32-bit PowerShell, relaunch with 64-bit PowerShell and Exit the current instance
+# If the OS is 64-bit and this script was launched with 32-bit PowerShell, relaunch with 64-bit PowerShell and exit the current instance
 If ( [Environment]::Is64BitOperatingSystem -eq $True -and [Environment]::Is64BitProcess -eq $False )
 {
 	&"$env:SystemRoot\sysnative\windowspowershell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -NoExit -File $myInvocation.InvocationName
@@ -135,6 +135,7 @@ $MsInfo32Timeout       = 300
 
 # Begin logging
 Start-Transcript -Path $Transcript -Force | Out-Null
+Write-Output $ScriptVersion
 
 # Check for pre-existing files and folders, and remove them if they exist
 If ( Test-Path -Path $Path ) 
@@ -279,7 +280,7 @@ Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object Name, Version, 
 
 # Driver information
 Write-Output "Gathering device driver information..."
-$DriverInfoAttributes = "DeviceName", "FriendlyName", "InfName", "DriverVersion", "IsSigned", "DriverDate"
+$DriverInfoAttributes = "DeviceName", "FriendlyName", "InfName", "DriverVersion", "DeviceID", "IsSigned", "DriverDate"
 Get-CimInstance -ClassName Win32_PnPSignedDriver | Select-Object -Property $DriverInfoAttributes | Sort-Object DeviceName | Format-Table -AutoSize | Out-File -FilePath $DriverVersions
 
 # Get default power plan
@@ -402,7 +403,7 @@ If ( $MsInfo32 -ne $null )
 # Check that the msinfo32.nfo file was created, msinfo32.exe returns an exit code of 0 regardless of whether or not it ran into an error, so this check is necessary.
 $SystemInfoExists = Test-Path -Path $SystemInfo
 
-If ( !$SystemInfoExists  )
+If ( !$SystemInfoExists )
 {
 	Write-Warning "$SystemInfo not found, msinfo32 may have crashed or was canceled by the user."
 }
@@ -413,7 +414,7 @@ If ( $ElevatedScript -ne $null )
 	Wait-Process -ProcessObject $ElevatedScript -ProcessName "elevated script" -TimeoutSeconds $ElevatedScriptTimeout
 }
 
-# Stop transcript since the file will be need to be moved into the output folder
+# Stop transcript since the file will need to be moved into the output folder
 Stop-Transcript | Out-Null
 
 # Move transcript to $Path
@@ -442,7 +443,6 @@ $ZipExists = Test-Path -Path $Zip
 
 If ( $ZipExists -eq "True" -and $CompressionResult -eq "True" )
 {
-
 	# Check that $Zip is not empty before declaring compression succeeded
 	$ZipSize = (Get-Item -Path $Zip).Length
 
