@@ -36,6 +36,7 @@ $Disks             = Join-Path -Path $Path -ChildPath "disks.txt"
 $Partitions        = Join-Path -Path $Path -ChildPath "partitions.txt"
 $PnPDevices        = Join-Path -Path $Path -ChildPath "pnp-devices.txt"
 $Processes         = Join-Path -Path $Path -ChildPath "processes.txt"
+$RestorePoints	   = Join-Path -Path $Path -ChildPath "restore-points.txt"
 $Services          = Join-Path -Path $Path -ChildPath "services.txt"
 $SleepDiagnostics  = Join-Path -Path $PowerReports -ChildPath "sleep-diagnostics.html"
 $SleepStudy        = Join-Path -Path $PowerReports -ChildPath "power-report.html"
@@ -98,7 +99,7 @@ If ( $(Test-Path -Path $KernelReportsPath) -eq $True -and $(Get-ChildItem -Path 
 	Get-ChildItem -Filter "*.dmp" -Path $KernelReportsPath -Recurse | Select-Object Name,LastWriteTime,$LengthMB | Out-File -FilePath $CrashLiveReports
 }
 
-# Gather a System Power Report, only supported on 8.1 and newer
+# Gather a power report
 Write-Output "Running system power report..."
 &$PowerCfgPath /sleepstudy /output $SleepStudy 2> $null| Out-Null
 
@@ -139,6 +140,10 @@ Else
 {
 	Get-CimInstance -ClassName Win32_Service | Select-Object Name, DisplayName, State, ProcessID | Sort-Object State, Name | Format-Table -AutoSize | Out-File -FilePath $Services
 }
+
+# List available Restore Points
+Write-Output "Finding restore points..."
+Get-ComputerRestorePoint | Format-Table -AutoSize | Out-File -FilePath $RestorePoints
 
 # Copy Windows Error Reports
 Write-Output "Copying Windows error reports..."
