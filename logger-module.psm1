@@ -238,12 +238,12 @@ Function Get-MemoryInfo
 	ForEach ( $DIMM in $PhysicalMemory )
 	{
 		# Translate the capacity from Bytes to Gigabytes
-		$SizeGB = [System.Math]::Round($DIMM.Capacity / 1GB)
+		$SizeGB   = [System.Math]::Round($DIMM.Capacity / 1GB)
 		$Capacity = "$SizeGB" + "GB"
 
 		# Translate DIMM formfactor
 		$FormFactorRaw = $DIMM.FormFactor -as [int]
-		$FormFactor = $FormFactorHashTable.$FormFactorRaw
+		$FormFactor    = $FormFactorHashTable.$FormFactorRaw
 
 		# If the lookup in the hashtable fails, report the raw value
 		If ( !$FormFactor )
@@ -253,7 +253,7 @@ Function Get-MemoryInfo
 
 		# Translate memory type as reported by the system firmware
 		$SMBIOSMemoryTypeRaw = $DIMM.SMBIOSMemoryType -as [int]
-		$SMBIOSType = $TypeHashTable.$SMBIOSMemoryTypeRaw
+		$SMBIOSType          = $TypeHashTable.$SMBIOSMemoryTypeRaw
 
 		# If the lookup in the hashtable fails, report the raw value
 		If ( !$SMBIOSType )
