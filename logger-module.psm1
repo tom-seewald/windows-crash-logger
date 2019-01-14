@@ -1,5 +1,5 @@
 # This is used instead of the built-in "Compress-Archive" cmdlet for serveral reasons
-# 1. Using .NET results in faster compression
+# 1. Using .NET directly results in faster compression
 # 2. Windows 8.1/Server 2012R2 does not have that cmdlet by default, since they ship with PowerShell 4.0
 Function Compress-Folder
 {
@@ -73,8 +73,23 @@ Function Get-DiskInformation
 	{
 		$MatchedPhysicalDisk = $PhysicalDisks | Where-Object { $_.SerialNumber.Trim() -eq $SerialNumber.Trim() }
 		$MatchedDisk         = $Disks | Where-Object { $_.SerialNumber.Trim() -eq $SerialNumber.Trim() }
-		$SizeGB              = [math]::Round($MatchedDisk.Size / 1GB,2)
-
+		
+		# If multiple disks have the same serial number create an array of their sizes to avoid a divison operation on a string
+		If ( $MatchedPhysicalDisk.Count -ge 1 )
+		{
+			Write-Information -MessageData "Multiple physical disks matched serialnumber $SerialNumber."
+			$SizeGB = @()
+			ForEach ( $PhysDisk in $MatchedPhysicalDisk )
+			{
+				$SizeGB += [math]::Round($PhysDisk.Size / 1GB, 2)
+			}
+		}
+		
+		Else
+		{
+			$SizeGB = [math]::Round($MatchedPhysicalDisk.Size / 1GB, 2)
+		}
+		
 		$DiskInformation =
 		[PSCustomObject]@{
 			"Model"			  = $MatchedDisk.Model;
@@ -106,38 +121,34 @@ Function Wait-Process
         $ProcessName,
         [parameter(Mandatory=$True)]
         [int]
-        $TimeoutSeconds,
-		[parameter(Mandatory=$False)]
-		[string]
-		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
-        $DestinationPath
+        $TimeoutSeconds
 	)
-
+	
 	$StartTime = Get-Date
 
 	If ( !$ProcessObject.HasExited )
 	{
+		$StopWatchLoop = [System.Diagnostics.StopWatch]::StartNew()
 		Write-Output "Waiting for $ProcessName to finish..."
 	}
 
 	While ( !$ProcessObject.HasExited -and $StartTime.AddSeconds($TimeoutSeconds) -gt (Get-Date) )
 	{
 		Start-Sleep -Milliseconds 500
+		$LoopWaitSec += .5
 	}
-
+	
 	If ( !$ProcessObject.HasExited -and $StartTime.AddSeconds($TimeoutSeconds) -le (Get-Date) )
 	{
 		Stop-Process -Force -Id $ProcessObject.Id 2> $null
-
-		If ( $DestinationPath )
-		{
-			If ( Test-Path -Path $DestinationPath )
-			{
-				Remove-Item $DestinationPath 2> $null
-			}
-		}
-
 		Write-Output "Killed $ProcessName due to $TimeoutSeconds second timeout."
+		Exit
+	}
+	
+	If ( $StopWatchLoop.IsRunning )
+	{
+		$StopWatchLoop.Stop()
+		Write-Information -MessageData "Waited for $ProcessName for $($StopWatchLoop.Elapsed.TotalSeconds) seconds."
 	}
 }
 
@@ -273,9 +284,9 @@ Function Get-MemoryInfo
 		}
 
 		# Get TypeDetail and convert it
-		$TypeDetail = $DIMM.TypeDetail
+		$TypeDetail         = $DIMM.TypeDetail
 		$TypeDetailBitField = [Convert]::ToString($TypeDetail,2)
-		$BitFieldLength = $TypeDetailBitField | Measure-Object -Character | Select-Object -ExpandProperty Characters
+		$BitFieldLength     = $TypeDetailBitField | Measure-Object -Character | Select-Object -ExpandProperty Characters
 
 		# Reverse bitfield, as PowerShell defaults to left to right for significant digits in binary (little endian)
 		$TypeDetailBitField = ([regex]::Matches($TypeDetailBitField,'.','RightToLeft') | ForEach-Object {$_.value}) -join ''
@@ -316,7 +327,9 @@ Function Get-MemoryInfo
 	}
 }
 
-# Copy the last N mini crash dumps, check both the standard path and the registry to see if there was an alternate path specified
+# Checks both the standard path and the registry to see if there was an alternate path specified
+# $CrashesToCollect is a per folder value
+# In the event both $MinidumpPath and $DefaultPath are not the same folder, and both have $CrashesToCollect or more dump files, it will collect 2 * $CrashesToCollect dumps.
 Function Copy-MiniCrashDumps
 {
 	Param
@@ -324,11 +337,12 @@ Function Copy-MiniCrashDumps
 		[Parameter(Mandatory=$True)]
 		[ValidateScript({ Test-Path -Path $_ -PathType Container })]
 		[string]
-		$DestinationPath
+		$DestinationPath,
+		[Parameter(Mandatory=$False)]
+		[ValidateRange(1,100)] 
+		[int]
+		$CrashesToCollect = 5
 	)
-	
-	# Only copy at most the 10 most recent minidumps, in the event both $MinidumpPath and $DefaultPath have 5 minidumps.
-	$CrashesToCollect = 5
 
 	$CrashSettings  = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
 	$MinidumpPath   = (Get-ItemProperty -Path $CrashSettings).MinidumpDir
@@ -361,7 +375,7 @@ Function Copy-MiniCrashDumps
 		Write-Output "$MinidumpPath does not exist." | Out-File -Append -FilePath $MiniDumpReport
 	}
 
-	# If they path in the registry and the default minidump path differ, also check the default path for crash dumps.
+	# If the path in the registry and the default minidump path differ, also check the default path for crash dumps.
 	If ( $DefaultPath -ne $MinidumpPath )
 	{
 		If ( Test-Path -Path $DefaultPath )
@@ -483,10 +497,11 @@ Function Get-RemoteFile
 		[parameter(Mandatory=$True)]
 		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
         [string]
-		$DestinationPath
+		$DestinationPath,
+		[parameter(Mandatory=$False)]
+		[ValidateRange(1,120)]
+		$TimeoutSeconds = 30
 	)
-
-	$TimeoutSec = 10
 
     Write-Output "Downloading $FileName..."
 
@@ -494,7 +509,7 @@ Function Get-RemoteFile
 	{
 		# This removes the progress bar, which slows the download to a crawl if enabled
 		$ProgressPreference = "SilentlyContinue"
-		Invoke-WebRequest -Uri $URL -OutFile $DestinationPath -TimeoutSec $TimeoutSec
+		Invoke-WebRequest -Uri $URL -OutFile $DestinationPath -TimeoutSec $TimeoutSeconds
 	}
 
 	Catch

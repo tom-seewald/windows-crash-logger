@@ -3,14 +3,14 @@
 ##############################
 
 # Version String
-$ScriptVersion = "Beta16 - 9/15/18"
+$ScriptVersion = "V2 Log Collector 1.00 - 1/6/19"
 
 # Detect Windows version
-$WindowsBuild  = [System.Environment]::OSVersion.Version.Build
-$Win1709Build  = 16299
-$Win81Build    = 9600
+$WindowsBuild = [System.Environment]::OSVersion.Version.Build
+$Win1709Build = 16299
+$Win81Build   = 9600
 
-# Check if we are running PowerShell Core, and relaunch with native PowerShell if possible.  
+# Check if we are running PowerShell Core
 # This is needed as some cmdlets and variables only work with legacy PowerShell (Get-Disk, Get-PhysicalDisk, Get-MpPreference, etc.)
 If ( $PSVersionTable.PSEdition -eq "core" )
 {
@@ -61,6 +61,9 @@ Write-Output $ScriptVersion
 Read-Host -Prompt "Press Enter to continue"
 Clear-Host
 
+# Track execution time of the script
+$StopWatchMain = [System.Diagnostics.StopWatch]::StartNew()
+
 # Create folder name
 $Time       = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 $FolderName = "$env:COMPUTERNAME-($Time)"
@@ -95,6 +98,7 @@ $NetworkInfo       = Join-Path -Path $Path -ChildPath "network-info.txt"
 $OSDetails         = Join-Path -Path $Path -ChildPath "os-details.txt"
 $PnPEvents         = Join-Path -Path $EventLogs -ChildPath "pnp-events.txt"
 $PowerPlan         = Join-Path -Path $PowerReports -ChildPath "power-plan.txt"
+$SleepStates       = Join-Path -Path $PowerReports -ChildPath "sleep-states.txt"
 $RAM               = Join-Path -Path $Path -ChildPath "ram.txt"
 $SystemEvents      = Join-Path -Path $EventLogs -ChildPath "system-events.txt"
 $SystemInfo        = Join-Path -Path $Path -ChildPath "msinfo32.nfo"
@@ -130,12 +134,12 @@ $WevtUtilPath    = Join-Path -Path $System32 -ChildPath "wevtutil.exe"
 $DriverQueryTimeout    = 60
 $DxDiagTimeout         = 60
 $ElevatedScriptTimeout = 150
-$LicenseTimeout        = 60
-$MsInfo32Timeout       = 300
+$LicenseTimeout        = 120
+$MsInfo32Timeout       = 420
 
 # Begin logging
 Start-Transcript -Path $Transcript -Force | Out-Null
-Write-Output $ScriptVersion
+Write-Information -MessageData $ScriptVersion
 
 # Check for pre-existing files and folders, and remove them if they exist
 If ( Test-Path -Path $Path ) 
@@ -267,6 +271,7 @@ Catch
 
 # Export Event Logs (2592000000 ms = 30 days)
 Write-Output "Exporting Application event Log..."
+$EventExportStart = $StopWatchMain.Elapsed.TotalSeconds
 &$WevtUtilPath query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text | Out-File -FilePath $AppEvents 2> $null
 
 Write-Output "Exporting System event log..."
@@ -274,6 +279,10 @@ Write-Output "Exporting System event log..."
 
 Write-Output "Exporting Kernel PnP event log..."
 &$WevtUtilPath query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text | Out-File -FilePath $PnPEvents 2> $null
+
+$EventExportEnd = $StopWatchMain.Elapsed.TotalSeconds
+$EventExportSec = $EventExportEnd - $EventExportStart
+Write-Information -MessageData "Event Log export took $EventExportSec seconds."
 
 # OS details
 Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object Name, Version, BuildNumber, OSArchitecture, LocalDateTime, LastBootUpTime, InstallDate, BootDevice, SystemDevice | Out-File -FilePath $OSDetails
@@ -286,6 +295,9 @@ Get-CimInstance -ClassName Win32_PnPSignedDriver | Select-Object -Property $Driv
 # Get default power plan
 Write-Output "Checking power settings..."
 &$PowerCfgPath /list 2> $null | Out-File -FilePath $PowerPlan
+
+# List available sleep states
+&$PowerCfgPath /availablesleepstates 2> $null | Out-File -FilePath $SleepStates
 
 # RAM info
 Write-Output "Getting hardware information..."
@@ -358,7 +370,7 @@ Else
 # Wait for licensingdiag.exe to finish
 If ( $LicenseDiag -ne $null )
 {
-	Wait-Process -ProcessObject $LicenseDiag -ProcessName "licensingdiag.exe" -TimeoutSeconds $LicenseTimeout -DestinationPath $LicenseFileTemp
+	Wait-Process -ProcessObject $LicenseDiag -ProcessName "licensingdiag.exe" -TimeoutSeconds $LicenseTimeout
 }
 
 # Now that licensingdiag.exe has finished, attempt to process the xml file, redact the license key, and export from xml to flat text
@@ -385,7 +397,7 @@ Else
 # Wait for dxdiag.exe to finish
 If ( $DxDiag -ne $null )
 {
-	Wait-Process -ProcessObject $DxDiag -ProcessName "dxdiag.exe" -TimeoutSeconds $DxDiagTimeout -DestinationPath $DxDiagFile
+	Wait-Process -ProcessObject $DxDiag -ProcessName "dxdiag.exe" -TimeoutSeconds $DxDiagTimeout
 }
 
 # Wait for driverquery.exe to finish
@@ -397,7 +409,7 @@ If ( $DxDiag -ne $null )
 # Wait for msinfo32.exe to finish
 If ( $MsInfo32 -ne $null )
 {
-	Wait-Process -ProcessObject $MsInfo32 -ProcessName "msinfo32.exe" -TimeoutSeconds $MsInfo32Timeout -DestinationPath $SystemInfo
+	Wait-Process -ProcessObject $MsInfo32 -ProcessName "msinfo32.exe" -TimeoutSeconds $MsInfo32Timeout
 }
 
 # Check that the msinfo32.nfo file was created, msinfo32.exe returns an exit code of 0 regardless of whether or not it ran into an error, so this check is necessary.
@@ -412,6 +424,17 @@ If ( !$SystemInfoExists )
 If ( $ElevatedScript -ne $null )
 {
 	Wait-Process -ProcessObject $ElevatedScript -ProcessName "elevated script" -TimeoutSeconds $ElevatedScriptTimeout
+}
+
+If ( $StopWatchMain.IsRunning )
+{
+	$StopWatchMain.Stop()
+	Write-Information -MessageData "main.ps1 execution time (before file hashing and compression) was $($StopWatchMain.Elapsed.TotalSeconds) seconds."
+}
+
+Else
+{
+	Write-Information -MessageData "StopWatch instance for main.ps1 was not running."
 }
 
 # Stop transcript since the file will need to be moved into the output folder
