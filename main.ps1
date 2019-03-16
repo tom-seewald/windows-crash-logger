@@ -3,7 +3,7 @@
 ##############################
 
 # Version String
-$ScriptVersion = "V2 Log Collector 1.00 - 1/6/19"
+$ScriptVersion = "V2 Log Collector 1.00 - 3/6/19"
 
 # Detect Windows version
 $WindowsBuild = [System.Environment]::OSVersion.Version.Build
@@ -95,7 +95,6 @@ $LicenseFile       = Join-Path -Path $Path -ChildPath "genuine.txt"
 $LicenseFileTemp   = Join-Path -Path $env:TEMP -ChildPath "genuine.xml"
 $Motherboard       = Join-Path -Path $Path -ChildPath "motherboard.txt"
 $NetworkInfo       = Join-Path -Path $Path -ChildPath "network-info.txt"
-$OSDetails         = Join-Path -Path $Path -ChildPath "os-details.txt"
 $PnPEvents         = Join-Path -Path $EventLogs -ChildPath "pnp-events.txt"
 $PowerPlan         = Join-Path -Path $PowerReports -ChildPath "power-plan.txt"
 $SleepStates       = Join-Path -Path $PowerReports -ChildPath "sleep-states.txt"
@@ -283,9 +282,6 @@ Write-Output "Exporting Kernel PnP event log..."
 $EventExportEnd = $StopWatchMain.Elapsed.TotalSeconds
 $EventExportSec = $EventExportEnd - $EventExportStart
 Write-Information -MessageData "Event Log export took $EventExportSec seconds."
-
-# OS details
-Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object Name, Version, BuildNumber, OSArchitecture, LocalDateTime, LastBootUpTime, InstallDate, BootDevice, SystemDevice | Out-File -FilePath $OSDetails
 
 # Driver information
 Write-Output "Gathering device driver information..."

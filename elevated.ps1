@@ -39,6 +39,7 @@ $AutorunsReport    = Join-Path -Path $Path -ChildPath "autorun.txt"
 $CrashDumpSettings = Join-Path -Path $CrashDumps -ChildPath "crash-dump-settings.txt"
 $CrashLiveReports  = Join-Path -Path $CrashDumps -ChildPath "live-kernel-reports.txt"
 $Disks             = Join-Path -Path $Path -ChildPath "disks.txt"
+$OSDetails         = Join-Path -Path $Path -ChildPath "os-details.txt"
 $Partitions        = Join-Path -Path $Path -ChildPath "partitions.txt"
 $PnPDevices        = Join-Path -Path $Path -ChildPath "pnp-devices.txt"
 $Processes         = Join-Path -Path $Path -ChildPath "processes.txt"
@@ -201,6 +202,13 @@ Else
 # List available Restore Points
 Write-Output "Finding restore points..."
 Get-ComputerRestorePoint | Format-Table -AutoSize | Out-File -FilePath $RestorePoints
+
+# Get information on the OS and its boot/firmware settings
+Write-Output "Checking OS details..."
+Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object Name, Version, BuildNumber, OSArchitecture, LocalDateTime, LastBootUpTime, InstallDate, BootDevice, SystemDevice | Out-File -Append -FilePath $OSDetails
+
+Write-Output "Getting boot information..."
+Get-BootInfo | Format-List | Out-File -Append -FilePath $OSDetails
 
 # Copy Windows Error Reports
 Write-Output "Copying Windows error reports..."

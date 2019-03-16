@@ -74,7 +74,7 @@ Function Get-DiskInformation
 		$MatchedPhysicalDisk = $PhysicalDisks | Where-Object { $_.SerialNumber.Trim() -eq $SerialNumber.Trim() }
 		$MatchedDisk         = $Disks | Where-Object { $_.SerialNumber.Trim() -eq $SerialNumber.Trim() }
 		
-		# If multiple disks have the same serial number create an array of their sizes to avoid a divison operation on a string
+		# If multiple disks have the same serial number create an array of their sizes
 		If ( $MatchedPhysicalDisk.Count -ge 1 )
 		{
 			Write-Information -MessageData "Multiple physical disks matched serialnumber $SerialNumber."
@@ -403,6 +403,72 @@ Function Copy-MiniCrashDumps
 			Write-Output "$DefaultPath does not exist." | Out-File -Append -FilePath $MiniDumpReport
 		}
 	}
+}
+
+Function Get-BootInfo
+{
+	$PowerRegPath =  "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power\"
+
+	# Check if the machine was booted into safe mode
+	$SafeMode = Get-CimInstance -ClassName Win32_ComputerSystem | Select-Object -ExpandProperty BootupState
+
+	# Fastboot status
+	If ( Test-Path -Path $PowerRegPath ) {
+		$FastStartupVal = Get-ItemProperty -Path $PowerRegPath -Name "HiberbootEnabled" | Select-Object -ExpandProperty HiberbootEnabled
+		
+		If ( $FastStartupVal -eq 1 )
+		{
+			$FastStartup = "Enabled"
+		}
+		
+		ElseIf ( $FastStartupVal -eq 0 )
+		{
+			$FastStartup = "Disabled"
+		}
+		
+		Else
+		{
+			$FastStartUp = "Unknown value $FastStartupVal"
+		}
+	}
+	Else
+	{
+		$FastStartup = "Reg key not found."
+	}
+
+	# Confirm if UEFI is enabled and if SecureBoot is enabled
+	$ErrorActionPreference = 'SilentlyContinue'
+	$FirmwareStatus = Confirm-SecureBootUEFI -ErrorVariable SecureBootError | Out-Null
+	$ErrorActionPreference = 'Continue'
+
+	If ($FirmwareStatus)
+	{
+		$FirmwareType = "BIOS"
+	}
+
+	Else
+	{
+		$FirmwareType = "UEFI"
+	}
+	
+	If ($SecureBootError)
+	{
+		$SecureBoot = "Not Enabled"
+	}
+	Else
+	{
+		$SecureBoot = "Enabled"
+	}
+	
+	$FirmwareInfo =
+	[PSCustomObject]@{
+		"Safe Mode"    = $SafeMode
+		"FastStartup"  = $FastStartup
+		"FirmwareType" = $FirmwareType
+		"SecureBoot"   = $SecureBoot
+	}
+
+	$FirmwareInfo
 }
 
 # Gather information about full memory dumps that exist on the system
