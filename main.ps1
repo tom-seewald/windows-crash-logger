@@ -3,18 +3,18 @@
 ##############################
 
 # Version String
-$ScriptVersion = "V2 Log Collector 1.00 - 3/6/19"
+$ScriptVersion = "V2 Log Collector 1.01 - 8/8/19"
 
 # Detect Windows version
 $WindowsBuild = [System.Environment]::OSVersion.Version.Build
 $Win1709Build = 16299
 $Win81Build   = 9600
 
-# Check if we are running PowerShell Core
+# Check if we are running PowerShell Core 6
 # This is needed as some cmdlets and variables only work with legacy PowerShell (Get-Disk, Get-PhysicalDisk, Get-MpPreference, etc.)
-If ( $PSVersionTable.PSEdition -eq "core" )
+If ( ($PSVersionTable.PSEdition -eq "core") -and ($Host.Version.Major -eq 6) )
 {
-	Return "This script only works with Windows-native Powershell."
+	Return "This script does not work with PowerShell 6, please use 5.1 or 7+"
 }
 
 # Abort if Controlled Folder Access is enabled, as it prevents log files from being placed on the desktop
@@ -56,7 +56,9 @@ Write-Output "
 
 "`n" * 3
 Write-Output $ScriptVersion
-"`n" * 3
+"`n"
+Write-Output "Script written by Spectrum"
+"`n"
 
 Read-Host -Prompt "Press Enter to continue"
 Clear-Host
@@ -125,7 +127,7 @@ $IpconfigPath    = Join-Path -Path $System32 -ChildPath "ipconfig.exe"
 $LicenseDiagPath = Join-Path -Path $System32 -ChildPath "licensingdiag.exe"
 $MsInfo32Path    = Join-Path -Path $System32 -ChildPath "msinfo32.exe" 
 $PowerCfgPath    = Join-Path -Path $System32 -ChildPath "powercfg.exe"
-$PowerShellPath  = Join-Path -Path $System32 -ChildPath "WindowsPowerShell\v1.0\powershell.exe"
+$PowerShellPath = (Get-Process -PID $PID).Path
 $RoutePath       = Join-Path -Path $System32 -ChildPath "route.exe"
 $WevtUtilPath    = Join-Path -Path $System32 -ChildPath "wevtutil.exe"
 
@@ -433,6 +435,9 @@ Else
 	Write-Information -MessageData "StopWatch instance for main.ps1 was not running."
 }
 
+# Convert files to UTF-8 for consistency
+Convert-UTF8 -Path $Path
+
 # Stop transcript since the file will need to be moved into the output folder
 Stop-Transcript | Out-Null
 
@@ -444,7 +449,7 @@ If ( Test-Path -Path $Transcript )
 
 # Get hash of files to later check for corruption, we skip .wer files as there can be hundreds of them which can take an excessive amount of time to hash
 $FileName = @{Name="FileName";Expression={Split-Path $_.Path -Leaf}}
-Get-ChildItem -Path $Path -Recurse -Exclude "*.wer" | Get-FileHash -Algorithm SHA256 | Select-Object $FileName, Hash, Algorithm | Sort-Object FileName | Format-Table -AutoSize | Out-File -FilePath $FileHashes
+Get-ChildItem -Path $Path -Recurse -Exclude "*.wer" -File | Get-FileHash -Algorithm SHA256 | Select-Object $FileName, Hash, Algorithm | Sort-Object FileName | Format-Table -AutoSize | Out-File -FilePath $FileHashes
 
 If ( Test-Path -Path $FileHashes )
 {
@@ -489,5 +494,5 @@ Else
 Write-Output "`n"
 Read-Host -Prompt "Press Enter to exit"
 
-# Stop script, it was launched with -NoExit so we must actually stop the process to close the Window
+# Stop script, it was launched with -NoExit so we must actually stop the process to close the window
 Stop-Process -ID $PID | Out-Null

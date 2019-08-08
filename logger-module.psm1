@@ -66,40 +66,57 @@ End Class
 Function Get-DiskInformation
 {
 	$DiskInfoArray = New-Object System.Collections.ArrayList
-	$PhysicalDisks = Get-PhysicalDisk
 	$Disks         = Get-Disk
+	$PhysicalDisks = Get-PhysicalDisk
 
-	ForEach ( $SerialNumber in $Disks.SerialNumber )
+	ForEach ( $Disk in $Disks )
 	{
-		$MatchedPhysicalDisk = $PhysicalDisks | Where-Object { $_.SerialNumber.Trim() -eq $SerialNumber.Trim() }
-		$MatchedDisk         = $Disks | Where-Object { $_.SerialNumber.Trim() -eq $SerialNumber.Trim() }
+
+		# Attempt to match based on Windows uniqueID assigned to each disk
+		If ( $Disk.UniqueId -ne $null )
+		{
+			$PhysicalDisk = $PhysicalDisks | Where-Object { $_.UniqueId -eq $Disk.UniqueId }
+		}
+		
+		# If a disk has a null uniqueID, fallback to using the serialnumber as a unique identifier
+		ElseIf ( $Disk.SerialNumber -ne $null )
+		{
+			Write-Warning "Disk has null UniqueId - attempting to match based on SerialNumber"
+			$PhysicalDisk = $PhysicalDisks | Where-Object { $_.SerialNumber -eq $Disk.SerialNumber }
+		}
+		
+		# Both the uniqueID and SerialNumber fields are null, inform user
+		Else
+		{
+			Write-Warning "Disk has null UniqueId and null SerialNumber - cannot find matched physical disk."
+		}
 		
 		# If multiple disks have the same serial number create an array of their sizes
-		If ( $MatchedPhysicalDisk.Count -ge 1 )
+		If ( $PhysicalDisk.Count -ge 1 )
 		{
-			Write-Information -MessageData "Multiple physical disks matched serialnumber $SerialNumber."
+			Write-Information -MessageData "Multiple physical disks matched uniqueID $Disk.UniqueId or SerialNumber $Disk.SerialNumber."
 			$SizeGB = @()
-			ForEach ( $PhysDisk in $MatchedPhysicalDisk )
+			ForEach ( $PhysDisk in $PhysicalDisk )
 			{
-				$SizeGB += [math]::Round($PhysDisk.Size / 1GB, 2)
+				$SizeGB += [math]::Round($PhysicalDisk.Size / 1GB, 2)
 			}
 		}
 		
 		Else
 		{
-			$SizeGB = [math]::Round($MatchedPhysicalDisk.Size / 1GB, 2)
+			$SizeGB = [math]::Round($PhysicalDisk.Size / 1GB, 2)
 		}
 		
 		$DiskInformation =
 		[PSCustomObject]@{
-			"Model"			  = $MatchedDisk.Model;
-			"Manufacturer"	  = $MatchedDisk.Manufacturer;
-			"SerialNumber"	  = $SerialNumber.Trim();
-			"MediaType"		  = $MatchedPhysicalDisk.MediaType;
-			"BusType"		  = $MatchedPhysicalDisk.BusType;
-			"BootDrive"		  = $MatchedDisk.IsBoot;
-			"PartitionStyle"  = $MatchedDisk.PartitionStyle;
-			"FirmwareVersion" = $MatchedDisk.FirmwareVersion;
+			"Model"			  = $Disk.Model;
+			"Manufacturer"	  = $Disk.Manufacturer;
+			"SerialNumber"	  = $Disk.SerialNumber;
+			"MediaType"		  = $PhysicalDisk.MediaType;
+			"BusType"		  = $PhysicalDisk.BusType;
+			"BootDrive"		  = $Disk.IsBoot;
+			"PartitionStyle"  = $Disk.PartitionStyle;
+			"FirmwareVersion" = $Disk.FirmwareVersion;
 			"Size(GB)"		  = $SizeGB;
 		}
 
@@ -211,29 +228,29 @@ Function Get-MemoryInfo
 	# Hash table for translating numeric value of MemoryType to a human-readable result
 	$TypeHashTable = 
 	@{
-		0  = "Unknown"
 		1  = "Other"
-		2  = "DRAM"
-		3  = "Synchronous DRAM"
-		4  = "Cache DRAM"
-		5  = "EDO"
-		6  = "EDRAM"
-		7  = "VRAM"
-		8  = "SRAM"
-		9  = "RAM"
-		10 = "ROM"
-		11 = "Flash"
-		12 = "SODIMM"
-		13 = "FEPROM"
+		2  = "Unknown"
+		3  = "DRAM"
+		4  = "EDRAM"
+		5  = "VRAM"
+		6  = "SRAM"
+		7  = "RAM"
+		8  = "ROM"
+		9  = "Flash"
+		10 = "EEPROM"
+		11 = "FEPROM"
+		12 = "EPROM"
+		13 = "CDRAM"
 		14 = "EPROM"
-		15 = "CDRAM"
-		16 = "Q3DRAM"
-		17 = "SDRAM"
-		18 = "RDRAM"
-		19 = "LCC"
-		20 = "DDR"
-		21 = "DDR2"
-		22 = "DDR2 FB-DIMM" 
+		15 = "SDRAM"
+		16 = "SGRAM"
+		17 = "RDRAM"
+		18 = "DDR"
+		19 = "DDR2"
+		20 = "DDR2 FB-DIMM"
+		21 = "Reserved"
+		22 = "Reserved"
+		23 = "Reserved"
 		24 = "DDR3"
 		25 = "FBD2"
 		26 = "DDR4"
@@ -587,6 +604,38 @@ Function Get-RemoteFile
 		If ( Test-Path -Path $DestinationPath )
 		{
 			Remove-Item -Path $DestinationPath -Force | Out-Null
+		}
+	}
+}
+
+# Converts all text files in a specified directory to UTF-8
+Function Convert-UTF8
+{
+	Param
+	(
+		[Parameter(Mandatory=$True)]
+		[ValidateScript({ Test-Path -Path $_ })]
+		[string]
+		$Path
+	)
+	
+	$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)
+	$Files = Get-ChildItem -Path $Path -Recurse -File -Include "*.txt", "*.wer"
+
+	ForEach ( $File in $Files ) {
+
+		$FilePath = $File.FullName
+
+		$Content = Get-Content -Path $FilePath
+
+		If ( $Content -ne $null )
+		{
+			[System.IO.File]::WriteAllLines($FilePath, $Content, $Utf8NoBomEncoding)
+		}
+		
+		Else
+		{
+			# Do nothing as the file is empty
 		}
 	}
 }
