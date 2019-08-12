@@ -422,6 +422,40 @@ Function Copy-MiniCrashDumps
 	}
 }
 
+# This script is a modified version of Chris Warwick's original
+Function Get-FirmwareType
+{
+	Add-Type -Language CSharp -TypeDefinition @'
+    using System;
+    using System.Runtime.InteropServices;
+
+    public class FirmwareType
+    {
+        [DllImport("kernel32.dll")]
+        static extern bool GetFirmwareType(ref uint FirmwareType);
+
+        public static uint GetFirmwareType()
+        {
+            uint firmwaretype = 0;
+            if (GetFirmwareType(ref firmwaretype))
+                return firmwaretype;
+            else
+                return 0;   // API call failed, just return 'unknown'
+        }
+    }
+'@
+
+
+    $Result = [FirmwareType]::GetFirmwareType()
+
+	Switch ($Result)
+	{
+		1		{return "BIOS"}
+		2   	{return "UEFI"}
+		Default {return "Unknown - $Result"}
+	}
+}
+
 Function Get-BootInfo
 {
 	$PowerRegPath =  "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power\"
@@ -454,27 +488,28 @@ Function Get-BootInfo
 	}
 
 	# Confirm if UEFI is enabled and if SecureBoot is enabled
-	$ErrorActionPreference = 'SilentlyContinue'
-	$FirmwareStatus = Confirm-SecureBootUEFI -ErrorVariable SecureBootError | Out-Null
-	$ErrorActionPreference = 'Continue'
-
-	If ($FirmwareStatus)
-	{
-		$FirmwareType = "BIOS"
-	}
-
-	Else
-	{
-		$FirmwareType = "UEFI"
-	}
+	$FirmwareType = Get-FirmwareType
 	
-	If ($SecureBootError)
+	# If the system is not using UEFI secureboot is not enabled as it is a UEFI-specific feature
+	If ( $FirmwareType -ne "UEFI" )
 	{
 		$SecureBoot = "Not Enabled"
 	}
+	
 	Else
 	{
-		$SecureBoot = "Enabled"
+		$ErrorActionPreference = 'SilentlyContinue'
+		$SecureBoot = Confirm-SecureBootUEFI | Out-Null
+		$ErrorActionPreference = 'Continue'
+
+		If ( $SecureBoot -eq $True )
+		{
+			$SecureBootStatus = "Enabled"
+		}
+		Else
+		{
+			$SecureBootStatus = "Not Enabled"
+		}
 	}
 	
 	$FirmwareInfo =
@@ -482,7 +517,7 @@ Function Get-BootInfo
 		"Safe Mode"    = $SafeMode
 		"FastStartup"  = $FastStartup
 		"FirmwareType" = $FirmwareType
-		"SecureBoot"   = $SecureBoot
+		"SecureBoot"   = $SecureBootStatus
 	}
 
 	$FirmwareInfo

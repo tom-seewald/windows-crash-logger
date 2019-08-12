@@ -3,7 +3,7 @@
 ##############################
 
 # Version String
-$ScriptVersion = "V2 Log Collector 1.01 - 8/8/19"
+$ScriptVersion = "V2 Log Collector 1.02 - 8/11/19"
 
 # Detect Windows version
 $WindowsBuild = [System.Environment]::OSVersion.Version.Build
