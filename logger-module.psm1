@@ -91,7 +91,7 @@ Function Get-DiskInformation
 			Write-Warning "Disk has null UniqueId and null SerialNumber - cannot find matched physical disk."
 		}
 		
-		# If multiple disks have the same serial number create an array of their sizes
+		# If multiple disks have the same uniqueID or SerialNumber create an array of their sizes
 		If ( $PhysicalDisk.Count -ge 1 )
 		{
 			Write-Information -MessageData "Multiple physical disks matched uniqueID $Disk.UniqueId or SerialNumber $Disk.SerialNumber."
@@ -450,9 +450,9 @@ Function Get-FirmwareType
 
 	Switch ($Result)
 	{
-		1		{return "BIOS"}
-		2   	{return "UEFI"}
-		Default {return "Unknown - $Result"}
+		1		{Return "BIOS"}
+		2   	{Return "UEFI"}
+		Default {Return "Unknown - $Result"}
 	}
 }
 
@@ -673,4 +673,132 @@ Function Convert-UTF8
 			# Do nothing as the file is empty
 		}
 	}
+}
+
+# We have to implement error handling when using Get-ItemProperty when getting registry key properties , as it can fail if a key is corrupted or was otherwise improperly written.
+# For further information, see this bug report: https://github.com/PowerShell/PowerShell/issues/9552
+Function Get-RegKeyProps
+{
+	Param
+	(
+		[Parameter(Mandatory=$True)]
+		[ValidateScript({ Test-Path -Path $_ })]
+		[string]
+		$Path
+	)
+
+	$RegKeys = Get-ChildItem -Path $Path
+	
+	# The absolute worst-case is that every key in the path is bad, so limit our attempts to that count.
+	$TryLimit = $RegKeys.Count
+	$TryCount = 1
+
+	While ( $TryCount -le $TryLimit )
+	{
+		$RegKeyPaths = $RegKeys | Select-Object -ExpandProperty PSPath
+		
+		Try
+		{
+			$RegKeyProps = Get-ItemProperty -LiteralPath $RegKeyPaths
+			Return $RegKeyProps
+		}
+		
+		Catch
+		{
+			Write-Information -MessageData "Bad registry key encountered when enumerating registry keys in $Path, attempting to identify the bad key..."
+			
+			# Identify the first key encountered that results in an error
+			ForEach ( $Key in $RegKeys )
+			{
+				Try
+				{
+					Get-ItemProperty -LiteralPath $Key.PSPath | Out-Null 
+				}
+				Catch
+				{
+					$BadKey = $Key.PSPath
+					break;
+				}
+			}
+
+			Write-Information -MessageData  "Bad registry key found: $BadKey"
+			
+			# Remove $BadKey from the list of registry keys to look at in the next loop
+			$RegKeys = $RegKeys | Where-Object { $BadKey -NotContains $_.PSPath }
+			
+			$TryCount++
+		}
+	}
+	
+	# If we get here then we were unable to find *any* valid registry keys in the given path, so report the problem and return nothing
+	Write-Warning "Could not find valid registry keys in $Path"
+	Write-Information -MessageData "Looped through $Path $TryLimit times and found no valid registry keys."
+	Return $null
+}
+
+# Will be called with Get-InstalledSoftware -DestinationPath $InstalledSoftware
+Function Get-InstalledSoftwareKeys
+{
+    Param
+	(
+		[parameter(Mandatory=$True)]
+		[string]
+		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
+		$DestinationPath
+	)
+    
+    # Registry locations that contain installed software information
+	$NativeSoftware      = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+    $Wow6432Software     = "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+    $InstalledComponents = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components"
+    $UserSoftware        = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall"
+	
+    $SoftwareAttributes = "DisplayName", "DisplayVersion", "Publisher", "InstallDate"
+
+	# Native software
+	Write-Output "Native Software" | Out-File -FilePath $DestinationPath
+
+	$NativeKeyProps = Get-RegKeyProps -Path $NativeSoftware
+	
+	$NativeKeyProps = $NativeKeyProps | Select-Object $SoftwareAttributes
+	$NativeKeyProps = $NativeKeyProps | Where-Object { $_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null }
+	$NativeKeyProps = $NativeKeyProps | Sort-Object DisplayName | Format-Table -AutoSize
+
+	$NativeKeyProps | Out-File -Append -FilePath $DestinationPath
+
+	# This only exists if 32-bit software is installed on a 64-bit OS
+    If ( Test-Path -Path $Wow6432Software )
+    {
+		Write-Output "32-bit Software" | Out-File -Append -FilePath $DestinationPath
+		
+		$Wow6432KeyProps = Get-RegKeyProps -Path $Wow6432Software
+		
+		$Wow6432KeyProps = $Wow6432KeyProps | Select-Object $SoftwareAttributes
+		$Wow6432KeyProps = $Wow6432KeyProps | Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null}
+		$Wow6432KeyProps = $Wow6432KeyProps | Sort-Object DisplayName | Format-Table -AutoSize
+
+		$Wow6432KeyProps | Out-File -Append -FilePath $DestinationPath
+    }
+
+	# Per-user software for the current user
+	Write-Output "User-specific Software" | Out-File -Append -FilePath $DestinationPath
+	
+	$UserSoftKeyProps = Get-RegKeyProps -Path $UserSoftware
+	
+	$UserSoftKeyProps = $UserSoftKeyProps | Select-Object $SoftwareAttributes 
+	$UserSoftKeyProps = $UserSoftKeyProps | Where-Object {$_.DisplayName -ne $null} 
+	$UserSoftKeyProps = $UserSoftKeyProps | Sort-Object DisplayName | Format-Table -AutoSize
+	
+	$UserSoftKeyProps | Out-File -Append -FilePath $DestinationPath
+
+	# Windows components
+	Write-Output "Installed Windows Components" | Out-File -Append -FilePath $DestinationPath
+	
+	$ComponentKeyProps = Get-RegKeyProps -Path $InstalledComponents
+	
+	$ComponentKeyProps = $ComponentKeyProps | Select-Object "(Default)", ComponentID, Version, Enabled 
+	$ComponentKeyProps = $ComponentKeyProps | Where-Object {$_."(Default)" -ne $null -or $_.ComponentID -ne $null} 
+	$ComponentKeyProps = $ComponentKeyProps | Sort-Object "(default)" | Format-Table -AutoSize
+
+	$ComponentKeyProps | Out-File -Append -FilePath $DestinationPath
 }

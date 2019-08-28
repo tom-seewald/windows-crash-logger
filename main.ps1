@@ -3,7 +3,7 @@
 ##############################
 
 # Version String
-$ScriptVersion = "V2 Log Collector 1.02 - 8/11/19"
+$ScriptVersion = "V2 Log Collector 1.03 - 8/28/19"
 
 # Detect Windows version
 $WindowsBuild = [System.Environment]::OSVersion.Version.Build
@@ -109,12 +109,6 @@ $Zip               = $Path + ".zip"
 # Where to download autoruns from and where to place the executable
 $AutorunsURL  = "https://live.sysinternals.com/autorunsc.exe"
 $AutorunsPath = Join-Path -Path $PSScriptRoot -ChildPath "autorunsc.exe"
-
-# Registry locations
-$32bitSoftware       = "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
-$InstalledComponents = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components"
-$NativeSoftware      = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
-$UserSoftware        = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall"
 
 # Native file and folder locations
 $HostsFile = Join-Path $env:SystemRoot -ChildPath "System32\drivers\etc\hosts"
@@ -323,25 +317,9 @@ $GpuAttributes = "Name", "DeviceID", "PNPDeviceID", "VideoProcessor", "CurrentRe
 				 "LastErrorCode", "ErrorDescription"
 Get-CimInstance -ClassName Win32_VideoController | Select-Object $GpuAttributes | Format-List | Out-File -FilePath $GPU
 
-# Installed software, first check native and then 32-bit (if it exists).
+# Installed software information
 Write-Output "Listing installed software..."
-
-$SoftwareAttributes = "DisplayName", "DisplayVersion", "Publisher", "InstallDate"
-Get-ItemProperty -Path "$NativeSoftware\*" | Select-Object $SoftwareAttributes | `
-Where-Object { $_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null } | `
-Sort-Object DisplayName | Format-Table -AutoSize | Out-File -FilePath $InstalledSoftware
-
-If ( Test-Path -Path $32bitSoftware )
-{
-	Write-Output "32-bit Software" | Out-File -Append -FilePath $InstalledSoftware
-	Get-ItemProperty -Path "$32bitSoftware\*" | Select-Object $SoftwareAttributes | Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null} | Sort-Object DisplayName | Format-Table -AutoSize | Format-Table -AutoSize | Out-File -Append -FilePath $InstalledSoftware
-}
-
-Write-Output "User-specific Software" | Out-File -Append -FilePath $InstalledSoftware
-Get-ItemProperty "$UserSoftware\*" | Select-Object $SoftwareAttributes | Where-Object {$_.DisplayName -ne $null} | Sort-Object DisplayName | Format-Table -AutoSize | Out-File -Append -FilePath $InstalledSoftware
-
-Write-Output "Installed Windows Components" | Out-File -Append -FilePath $InstalledSoftware
-Get-ItemProperty "$InstalledComponents\*" | Select-Object "(Default)", ComponentID, Version, Enabled | Where-Object {$_."(Default)" -ne $null -or $_.ComponentID -ne $null} | Sort-Object "(default)" | Format-Table -AutoSize | Out-File -Append -FilePath $InstalledSoftware
+Get-InstalledSoftwareKeys -DestinationPath $InstalledSoftware
 
 # Installed Windows Updates
 Write-Output "Listing installed Windows updates..."
@@ -435,7 +413,7 @@ Else
 	Write-Information -MessageData "StopWatch instance for main.ps1 was not running."
 }
 
-# Convert files to UTF-8 for consistency
+# Convert text files to UTF-8 for consistency
 Convert-UTF8 -Path $Path
 
 # Stop transcript since the file will need to be moved into the output folder

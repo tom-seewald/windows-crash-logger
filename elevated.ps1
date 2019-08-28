@@ -170,7 +170,12 @@ $SizeGB     = @{Name="Size (GB)";Expression={[math]::Round($_.Capacity / 1GB, 2)
 $FreeGB     = @{Name="Free (GB)";Expression={[math]::Round($_.FreeSpace / 1GB, 2)}}
 $DevicePath = @{Name="Device Path";Expression={[diskinfo]::GetDeviceName($_.DriveLetter)}}
 
-Get-CimInstance -ClassName Win32_Volume | Where-Object { $_.DriveLetter -ne $null } | Select-Object -Property DriveLetter, $SizeGB, $FreeGB, $DevicePath | Sort-Object DriveLetter | Format-Table -AutoSize | Out-File -FilePath $Partitions
+$Volumes = Get-CimInstance -ClassName Win32_Volume 
+$Volumes = $Volumes | Where-Object { $_.DriveLetter -ne $null } | Select-Object -Property DriveLetter, $SizeGB, $FreeGB, $DevicePath 
+$Volumes = $Volumes | Sort-Object DriveLetter | Format-Table -AutoSize
+
+$Volumes | Out-File -FilePath $Partitions
+
 Get-Partition | Format-List | Out-File -Append -FilePath $Partitions
 Get-DiskInformation | Out-File -FilePath $Disks
 
