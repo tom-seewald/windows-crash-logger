@@ -466,17 +466,17 @@ Function Get-BootInfo
 	# Fastboot status
 	If ( Test-Path -Path $PowerRegPath ) {
 		$FastStartupVal = Get-ItemProperty -Path $PowerRegPath -Name "HiberbootEnabled" | Select-Object -ExpandProperty HiberbootEnabled
-		
+
 		If ( $FastStartupVal -eq 1 )
 		{
 			$FastStartup = "Enabled"
 		}
-		
+
 		ElseIf ( $FastStartupVal -eq 0 )
 		{
 			$FastStartup = "Disabled"
 		}
-		
+
 		Else
 		{
 			$FastStartUp = "Unknown value $FastStartupVal"
@@ -495,7 +495,7 @@ Function Get-BootInfo
 	{
 		$SecureBoot = "Not Enabled"
 	}
-	
+
 	Else
 	{
 		$ErrorActionPreference = 'SilentlyContinue'
@@ -511,7 +511,7 @@ Function Get-BootInfo
 			$SecureBootStatus = "Not Enabled"
 		}
 	}
-	
+
 	$FirmwareInfo =
 	[PSCustomObject]@{
 		"Safe Mode"    = $SafeMode
@@ -725,7 +725,7 @@ Function Get-RegKeyProps
 			
 			# Remove $BadKey from the list of registry keys to look at in the next loop
 			$RegKeys = $RegKeys | Where-Object { $BadKey -NotContains $_.PSPath }
-			
+
 			$TryCount++
 		}
 	}
@@ -733,6 +733,7 @@ Function Get-RegKeyProps
 	# If we get here then we were unable to find *any* valid registry keys in the given path, so report the problem and return nothing
 	Write-Warning "Could not find valid registry keys in $Path"
 	Write-Information -MessageData "Looped through $Path $TryLimit times and found no valid registry keys."
+
 	Return $null
 }
 
@@ -748,11 +749,11 @@ Function Get-InstalledSoftwareKeys
 	)
     
     # Registry locations that contain installed software information
-	$NativeSoftware      = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+    $NativeSoftware      = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
     $Wow6432Software     = "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
     $InstalledComponents = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components"
     $UserSoftware        = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall"
-	
+
     $SoftwareAttributes = "DisplayName", "DisplayVersion", "Publisher", "InstallDate"
 
 	# Native software
@@ -770,9 +771,9 @@ Function Get-InstalledSoftwareKeys
     If ( Test-Path -Path $Wow6432Software )
     {
 		Write-Output "32-bit Software" | Out-File -Append -FilePath $DestinationPath
-		
+
 		$Wow6432KeyProps = Get-RegKeyProps -Path $Wow6432Software
-		
+
 		$Wow6432KeyProps = $Wow6432KeyProps | Select-Object $SoftwareAttributes
 		$Wow6432KeyProps = $Wow6432KeyProps | Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null}
 		$Wow6432KeyProps = $Wow6432KeyProps | Sort-Object DisplayName | Format-Table -AutoSize
@@ -782,18 +783,18 @@ Function Get-InstalledSoftwareKeys
 
 	# Per-user software for the current user
 	Write-Output "User-specific Software" | Out-File -Append -FilePath $DestinationPath
-	
+
 	$UserSoftKeyProps = Get-RegKeyProps -Path $UserSoftware
-	
+
 	$UserSoftKeyProps = $UserSoftKeyProps | Select-Object $SoftwareAttributes 
 	$UserSoftKeyProps = $UserSoftKeyProps | Where-Object {$_.DisplayName -ne $null} 
 	$UserSoftKeyProps = $UserSoftKeyProps | Sort-Object DisplayName | Format-Table -AutoSize
-	
+
 	$UserSoftKeyProps | Out-File -Append -FilePath $DestinationPath
 
 	# Windows components
 	Write-Output "Installed Windows Components" | Out-File -Append -FilePath $DestinationPath
-	
+
 	$ComponentKeyProps = Get-RegKeyProps -Path $InstalledComponents
 	
 	$ComponentKeyProps = $ComponentKeyProps | Select-Object "(Default)", ComponentID, Version, Enabled 
