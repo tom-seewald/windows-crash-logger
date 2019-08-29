@@ -541,7 +541,7 @@ Function Get-FullCrashDumpInfo
 	
 	If ( Test-Path -Path $DumpPath )
 	{
-		$DumpPathProperties = $(Get-Item -Path $DumpPath)
+		$DumpPathProperties = Get-Item -Path $DumpPath
 		
 		Write-Output "Crash dump found at $DumpPath" | Out-File -Append -FilePath $MemoryDumpReport
 		Write-Output "Creation date: $((Get-Item -Path $DumpPath).LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
@@ -696,7 +696,7 @@ Function Get-RegKeyProps
 	While ( $TryCount -le $TryLimit )
 	{
 		$RegKeyPaths = $RegKeys | Select-Object -ExpandProperty PSPath
-		
+
 		Try
 		{
 			$RegKeyProps = Get-ItemProperty -LiteralPath $RegKeyPaths
@@ -714,7 +714,9 @@ Function Get-RegKeyProps
 				{
 					Get-ItemProperty -LiteralPath $Key.PSPath | Out-Null 
 				}
-				Catch
+				Catch# Set window size to 1000 by 1000 to avoid truncation when sending output to files
+$Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(1000,1000)
+
 				{
 					$BadKey = $Key.PSPath
 					break;
