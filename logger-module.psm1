@@ -1,4 +1,4 @@
-# This is used instead of the built-in "Compress-Archive" cmdlet for serveral reasons
+﻿# This is used instead of the built-in "Compress-Archive" cmdlet for serveral reasons
 # 1. Using .NET directly results in faster compression
 # 2. Windows 8.1/Server 2012R2 does not have that cmdlet by default, since they ship with PowerShell 4.0
 Function Compress-Folder
@@ -653,7 +653,7 @@ Function Convert-UTF8
 		[string]
 		$Path
 	)
-	
+
 	$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)
 	$Files = Get-ChildItem -Path $Path -Recurse -File -Include "*.txt", "*.wer"
 
@@ -667,7 +667,7 @@ Function Convert-UTF8
 		{
 			[System.IO.File]::WriteAllLines($FilePath, $Content, $Utf8NoBomEncoding)
 		}
-		
+
 		Else
 		{
 			# Do nothing as the file is empty
@@ -702,11 +702,11 @@ Function Get-RegKeyProps
 			$RegKeyProps = Get-ItemProperty -LiteralPath $RegKeyPaths
 			Return $RegKeyProps
 		}
-		
+
 		Catch
 		{
 			Write-Information -MessageData "Bad registry key encountered when enumerating registry keys in $Path, attempting to identify the bad key..."
-			
+
 			# Identify the first key encountered that results in an error
 			ForEach ( $Key in $RegKeys )
 			{
@@ -729,14 +729,14 @@ Function Get-RegKeyProps
 			$TryCount++
 		}
 	}
-	
+
 	# If we get here then we were unable to find *any* valid registry keys in the given path, so report the problem and return nothing
 	Write-Warning "Could not find valid registry keys in $Path"
 	Write-Information -MessageData "Looped through $Path $TryLimit times and found no valid registry keys."
 	Return $null
 }
 
-# Will be called with Get-InstalledSoftware -DestinationPath $InstalledSoftware
+# Get information about installed software by looking at the registry
 Function Get-InstalledSoftwareKeys
 {
     Param
