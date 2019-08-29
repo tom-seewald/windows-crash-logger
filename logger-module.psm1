@@ -140,7 +140,7 @@ Function Wait-Process
         [int]
         $TimeoutSeconds
 	)
-	
+
 	$StartTime = Get-Date
 
 	If ( !$ProcessObject.HasExited )
@@ -154,14 +154,14 @@ Function Wait-Process
 		Start-Sleep -Milliseconds 500
 		$LoopWaitSec += .5
 	}
-	
+
 	If ( !$ProcessObject.HasExited -and $StartTime.AddSeconds($TimeoutSeconds) -le (Get-Date) )
 	{
 		Stop-Process -Force -Id $ProcessObject.Id 2> $null
 		Write-Output "Killed $ProcessName due to $TimeoutSeconds second timeout."
 		Exit
 	}
-	
+
 	If ( $StopWatchLoop.IsRunning )
 	{
 		$StopWatchLoop.Stop()
@@ -305,7 +305,7 @@ Function Get-MemoryInfo
 		$TypeDetailBitField = [Convert]::ToString($TypeDetail,2)
 		$BitFieldLength     = $TypeDetailBitField | Measure-Object -Character | Select-Object -ExpandProperty Characters
 
-		# Reverse bitfield, as PowerShell defaults to left to right for significant digits in binary (little endian)
+		# Reverse bitfield, as PowerShell defaults to left to right for significant digits in binary
 		$TypeDetailBitField = ([regex]::Matches($TypeDetailBitField,'.','RightToLeft') | ForEach-Object {$_.value}) -join ''
 
 		$TypeDetailArray = @()
