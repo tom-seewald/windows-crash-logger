@@ -1,9 +1,9 @@
-##############################
+﻿##############################
 # Script Written By Spectrum #
 ##############################
 
 # Version String
-$ScriptVersion = "V2 Log Collector 1.03 - 8/28/19"
+$ScriptVersion = "V2 Log Collector 1.03 - 8/29/19"
 
 # Detect Windows version
 $WindowsBuild = [System.Environment]::OSVersion.Version.Build
@@ -121,7 +121,7 @@ $IpconfigPath    = Join-Path -Path $System32 -ChildPath "ipconfig.exe"
 $LicenseDiagPath = Join-Path -Path $System32 -ChildPath "licensingdiag.exe"
 $MsInfo32Path    = Join-Path -Path $System32 -ChildPath "msinfo32.exe" 
 $PowerCfgPath    = Join-Path -Path $System32 -ChildPath "powercfg.exe"
-$PowerShellPath = (Get-Process -PID $PID).Path
+$PowerShellPath  = (Get-Process -PID $PID).Path
 $RoutePath       = Join-Path -Path $System32 -ChildPath "route.exe"
 $WevtUtilPath    = Join-Path -Path $System32 -ChildPath "wevtutil.exe"
 
@@ -135,6 +135,22 @@ $MsInfo32Timeout       = 420
 # Begin logging
 Start-Transcript -Path $Transcript -Force | Out-Null
 Write-Information -MessageData $ScriptVersion
+
+# Import custom module containing support functions
+Try
+{
+    Import-Module $LoggerModule
+}
+
+Catch
+{
+    Write-Warning "Failed to import $LoggerModule."
+    Write-Output $error[0]
+    Return "Script cannot continue."
+}
+
+# Set window size to 1000 by 1000 to avoid truncation when sending output to files
+$Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(1000,1000)
 
 # Check for pre-existing files and folders, and remove them if they exist
 If ( Test-Path -Path $Path ) 
@@ -161,22 +177,6 @@ Catch
 	Write-Output $error[0]
 	Return "Script cannot continue."
 }
-
-# Import custom module containing support functions
-Try
-{
-    Import-Module $LoggerModule
-}
-
-Catch
-{
-    Write-Warning "Failed to import $LoggerModule."
-	Write-Output $error[0]
-    Return "Script cannot continue."
-}
-
-# Set window size to 1000 by 1000 to avoid truncation when sending output to files
-$Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(1000,1000)
 
 # Check that the OS is supported, warn if it is not
 If ( $WindowsBuild -lt $Win81Build )
