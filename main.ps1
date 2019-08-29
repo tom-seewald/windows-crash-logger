@@ -11,7 +11,7 @@ $Win1709Build = 16299
 $Win81Build   = 9600
 
 # Check if we are running PowerShell Core 6
-# This is needed as some cmdlets and variables only work with legacy PowerShell (Get-Disk, Get-PhysicalDisk, Get-MpPreference, etc.)
+# This is needed as some cmdlets and variables only work with legacy PowerShell or PowerShell 7+ (Get-Disk, Get-PhysicalDisk, Get-MpPreference, etc.)
 If ( ($PSVersionTable.PSEdition -eq "core") -and ($Host.Version.Major -eq 6) )
 {
 	Return "This script does not work with PowerShell 6, please use 5.1 or 7+"
@@ -195,7 +195,7 @@ Try
 Catch
 {
     Write-Warning "Failed to launch $MsInfo32Path"
-	Write-Output $error[0]
+    Write-Output $error[0]
 }
 
 # Download autorunsc.exe, this will later be run in elevated.ps1
