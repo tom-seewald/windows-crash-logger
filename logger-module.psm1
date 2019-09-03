@@ -360,7 +360,7 @@ Function Get-MemoryInfo
 }
 
 # Checks both the standard path and the registry to see if there was an alternate path specified
-# $CrashesToCollect is a per folder value
+# $CrashesToCollect is a per-folder value
 # In the event both $MinidumpPath and $DefaultPath are not the same folder, and both have $CrashesToCollect or more dump files, it will collect 2 * $CrashesToCollect dumps.
 Function Copy-MiniCrashDumps
 {
@@ -376,23 +376,30 @@ Function Copy-MiniCrashDumps
 		$CrashesToCollect = 5
 	)
 
-	# TODO: Check if $CrashSettings exists, then check if $miniDumpPath is not $null before continuing
+	$SizeMB = @{Name="Size (MB)";Expression={[math]::Round($_.Length / 1MB, 4)}}
 	$CrashSettings  = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
-	$MinidumpPath   = (Get-ItemProperty -Path $CrashSettings).MinidumpDir
+	
+	If ( Test-Path -Path $CrashSettings )
+	{
+		$MinidumpPath = (Get-ItemProperty -Path $CrashSettings).MinidumpDir
+	}
+
 	$DefaultPath    = Join-Path -Path $env:SystemRoot -ChildPath "Minidump"
 	$MiniDumpReport = Join-Path -Path $DestinationPath -ChildPath "mini-crash-dumps.txt"
 
 	# Always look where the registry points to for minidumps
-	If ( Test-Path -Path $MinidumpPath )
+	If ( $MinidumpPath -and (Test-Path -Path $MinidumpPath) )
 	{
-		Get-ChildItem -Path $MinidumpPath | Sort-Object LastWriteTime -Descending | Out-File -Append -FilePath $MiniDumpReport
+		$Report = Get-ChildItem -Path $MinidumpPath | Sort-Object LastWriteTime -Descending | Select-Object Mode,LastWriteTime,$SizeMB,Name
+		$Report | Out-File -Append -FilePath $MiniDumpReport
 
 		$MiniDumpPathContents = Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath
 
 		If ( $MiniDumpPathContents -ne $null )
 		{
 			Write-Output "Copying crash dumps from $MinidumpPath..."
-			Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First $CrashesToCollect | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$CrashDumps" } -ErrorAction SilentlyContinue
+			$CrashDumps = Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First $CrashesToCollect
+			$CrashDumps	| ForEach-Object { Copy-Item -Path $_.FullName -Destination "$CrashDumps" }
 		}
 
 		Else
@@ -413,14 +420,16 @@ Function Copy-MiniCrashDumps
 	{
 		If ( Test-Path -Path $DefaultPath )
 		{
-			Get-ChildItem -Path $DefaultPath | Sort-Object LastWriteTime -Descending | Out-File -Append -FilePath $MiniDumpReport
+			$Report = Get-ChildItem -Path $DefaultPath | Sort-Object LastWriteTime -Descending | Select-Object Mode,LastWriteTime,$SizeMB,Name
+			$Report	| Out-File -Append -FilePath $MiniDumpReport
 
 			$DefaultPathContents = Get-ChildItem -Filter "*.dmp" -Path $DefaultPath
 
 			If ( $DefaultPathContents -ne $null )
 			{
 				Write-Output "Copying crash dumps from $DefaultPath..."
-				Get-ChildItem -Filter "*.dmp" -Path $DefaultPath  | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First $CrashesToCollect | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$CrashDumps" }
+				$CrashDumps = Get-ChildItem -Filter "*.dmp" -Path $DefaultPath  | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First $CrashesToCollect
+				$CrashDumps | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$CrashDumps" }
 			}
 
 			Else
