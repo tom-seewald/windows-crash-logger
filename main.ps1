@@ -3,7 +3,15 @@
 ##############################
 
 # Version String
-$ScriptVersion = "V2 Log Collector 1.03 - 8/29/19"
+$ScriptVersion = "V2 Log Collector 1.03 - 9/02/19"
+
+# If we are running PowerShell Core, ensure that it is running Windows
+If ( ($PSVersionTable.PSEdition -eq "core") -and (!$IsWindows) )
+{
+	Write-Warning "This script is for triaging Windows kernel panics, and as such does not work on non-Windows systems."
+	Write-Warning "Detected OS: $env:OS"
+	Return
+}
 
 # Detect Windows version
 $WindowsBuild = [System.Environment]::OSVersion.Version.Build
