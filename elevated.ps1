@@ -13,6 +13,9 @@ Param
 # Track execution time of the script
 $StopWatchElevated = [System.Diagnostics.StopWatch]::StartNew()
 
+# Default to UTF-8 output
+$PSDefaultParameterValues['*:Encoding'] = 'UTF8'
+
 # Detect Windows version
 $WindowsBuild  = [System.Environment]::OSVersion.Version.Build
 $Win10MinBuild = 10240
@@ -210,7 +213,8 @@ Get-ComputerRestorePoint | Format-Table -AutoSize | Out-File -FilePath $RestoreP
 
 # Get information on the OS and its boot/firmware settings
 Write-Output "Checking OS details..."
-Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object Name, Version, BuildNumber, OSArchitecture, LocalDateTime, LastBootUpTime, InstallDate, BootDevice, SystemDevice | Out-File -Append -FilePath $OSDetails
+$Properties = "Name", "Version", "BuildNumber", "OSArchitecture", "LocalDateTime", "LastBootUpTime", "InstallDate", "BootDevice", "SystemDevice"
+Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object $Properties | Out-File -Append -FilePath $OSDetails
 
 Write-Output "Getting boot information..."
 Get-BootInfo | Format-List | Out-File -Append -FilePath $OSDetails
@@ -226,6 +230,9 @@ If ( Test-Path -Path $ProgramDataWER )
 {
 	Copy-Item "$ProgramDataWER\*" -Destination $WER -Recurse -Container 2> $null | Out-Null
 }
+
+# Convert WER files to UTF-8 for consistency with the other output
+Convert-UTF8 -Path $WER
 
 # Find autostart entries, scheduled tasks etc. with Autorunsc.exe
 If ( Test-Path -Path $AutoRunsPath )
