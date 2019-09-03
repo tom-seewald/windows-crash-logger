@@ -5,6 +5,9 @@
 # Version String
 $ScriptVersion = "V2 Log Collector 1.03 - 9/02/19"
 
+# Default to UTF-8 output
+$PSDefaultParameterValues['*:Encoding'] = 'UTF8'
+
 # If we are running PowerShell Core, ensure that it is running Windows
 If ( ($PSVersionTable.PSEdition -eq "core") -and (!$IsWindows) )
 {
@@ -421,9 +424,6 @@ Else
 	Write-Information -MessageData "StopWatch instance for main.ps1 was not running."
 }
 
-# Convert text files to UTF-8 for consistency
-Convert-UTF8 -Path $Path
-
 # Stop transcript since the file will need to be moved into the output folder
 Stop-Transcript | Out-Null
 
@@ -435,7 +435,9 @@ If ( Test-Path -Path $Transcript )
 
 # Get hash of files to later check for corruption, we skip .wer files as there can be hundreds of them which can take an excessive amount of time to hash
 $FileName = @{Name="FileName";Expression={Split-Path $_.Path -Leaf}}
-Get-ChildItem -Path $Path -Recurse -Exclude "*.wer" -File | Get-FileHash -Algorithm SHA256 | Select-Object $FileName, Hash, Algorithm | Sort-Object FileName | Format-Table -AutoSize | Out-File -FilePath $FileHashes
+$FilesToHash = Get-ChildItem -Path $Path -Recurse -Exclude "*.wer" -File
+$Hashes = $FilesToHash | Get-FileHash -Algorithm SHA256
+$Hashes | Select-Object $FileName, Hash, Algorithm | Sort-Object FileName | Format-Table -AutoSize | Out-File -FilePath $FileHashes
 
 If ( Test-Path -Path $FileHashes )
 {
