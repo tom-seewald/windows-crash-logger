@@ -37,32 +37,221 @@ Function Compress-Folder
 	}
 }
 
-# Allows us to map drive letters to disk paths in the NT Object Manager namespace
-Function Import-DriveInformation
+# Converts all text files in a specified directory to UTF-8
+Function Convert-UTF8
 {
-$DiskInfoCode =
-@'
+	Param
+	(
+		[Parameter(Mandatory=$True)]
+		[ValidateScript({ Test-Path -Path $_ })]
+		[string]
+		$Path
+	)
 
-Public Class DiskInfo
-	Private Declare Function QueryDosDevice Lib "kernel32" Alias "QueryDosDeviceA" (ByVal lpDeviceName As String, ByVal lpTargetPath As String, ByVal ucchMax As Long) As Long
+	$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)
+	$Files = Get-ChildItem -Path $Path -Recurse -File -Include "*.txt", "*.wer"
 
-	Shared Function GetDeviceName(sDisk As String) As String
+	ForEach ( $File in $Files ) {
 
-		Dim sDevice As String = New String(" ",50)
+		$FilePath = $File.FullName
 
-		If QueryDosDevice(sDisk, sDevice, sDevice.Length) Then
-			Return sDevice
+		$Content = Get-Content -Path $FilePath
+
+		If ( $Content -ne $null )
+		{
+			[System.IO.File]::WriteAllLines($FilePath, $Content, $Utf8NoBomEncoding)
+		}
 
 		Else
-			Throw New System.Exception("sDisk value not found - not a disk.")
+		{
+			# Do nothing as the file is empty
+		}
+	}
+}
 
-		End If
-	End Function
-End Class
+# Checks both the standard path and the registry to see if there was an alternate path specified
+# $CrashesToCollect is a per-folder value
+# In the event both $MinidumpPath and $DefaultPath are not the same folder, and both have $CrashesToCollect or more dump files, it will collect 2 * $CrashesToCollect dumps.
+Function Copy-MiniCrashDumps
+{
+	Param
+	(
+		[Parameter(Mandatory=$True)]
+		[ValidateScript({ Test-Path -Path $_ -PathType Container })]
+		[string]
+		$DestinationPath,
+		[Parameter(Mandatory=$False)]
+		[ValidateRange(1,100)] 
+		[int]
+		$CrashesToCollect = 5
+	)
 
-'@
+	$SizeMB = @{Name="Size (MB)";Expression={[math]::Round($_.Length / 1MB, 4)}}
+	$CrashSettings  = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
+	
+	If ( Test-Path -Path $CrashSettings )
+	{
+		$MinidumpPath = (Get-ItemProperty -Path $CrashSettings).MinidumpDir
+	}
 
-	Add-Type $DiskInfoCode -Language VisualBasic
+	$DefaultPath    = Join-Path -Path $env:SystemRoot -ChildPath "Minidump"
+	$MiniDumpReport = Join-Path -Path $DestinationPath -ChildPath "mini-crash-dumps.txt"
+
+	# Always look where the registry points to for minidumps
+	If ( $MinidumpPath -and (Test-Path -Path $MinidumpPath) )
+	{
+		$Report = Get-ChildItem -Path $MinidumpPath | Sort-Object LastWriteTime -Descending | Select-Object Mode,LastWriteTime,$SizeMB,Name
+		$Report | Out-File -Append -FilePath $MiniDumpReport
+
+		$MiniDumpPathContents = Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath
+
+		If ( $MiniDumpPathContents -ne $null )
+		{
+			Write-Output "Copying crash dumps from $MinidumpPath..."
+			$CrashDumps = Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First $CrashesToCollect
+			$CrashDumps	| ForEach-Object { Copy-Item -Path $_.FullName -Destination "$CrashDumps" }
+		}
+
+		Else
+		{
+			Write-Output "No crash dumps to copy from $MinidumpPath"
+			Write-Output "$MinidumpPath contains no dump files." | Out-File -Append -FilePath $MiniDumpReport
+		}
+	}
+
+	Else
+	{
+		Write-Output "No crash dumps to copy from $MinidumpPath"
+		Write-Output "$MinidumpPath does not exist." | Out-File -Append -FilePath $MiniDumpReport
+	}
+
+	# If the path in the registry and the default minidump path differ, also check the default path for crash dumps.
+	If ( $DefaultPath -ne $MinidumpPath )
+	{
+		If ( Test-Path -Path $DefaultPath )
+		{
+			$Report = Get-ChildItem -Path $DefaultPath | Sort-Object LastWriteTime -Descending | Select-Object Mode,LastWriteTime,$SizeMB,Name
+			$Report	| Out-File -Append -FilePath $MiniDumpReport
+
+			$DefaultPathContents = Get-ChildItem -Filter "*.dmp" -Path $DefaultPath
+
+			If ( $DefaultPathContents -ne $null )
+			{
+				Write-Output "Copying crash dumps from $DefaultPath..."
+				$CrashDumps = Get-ChildItem -Filter "*.dmp" -Path $DefaultPath  | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First $CrashesToCollect
+				$CrashDumps | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$CrashDumps" }
+			}
+
+			Else
+			{
+				Write-Output "No crash dumps to copy from $DefaultPath"
+				Write-Output "$DefaultPath contains no dump files." | Out-File -Append -FilePath $MiniDumpReport
+			}
+		}
+
+		Else
+		{
+			Write-Output "No crash dumps to copy from $DefaultPath"
+			Write-Output "$DefaultPath does not exist." | Out-File -Append -FilePath $MiniDumpReport
+		}
+	}
+}
+
+Function Get-BootInfo
+{
+	$PowerRegPath =  "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power\"
+
+	# Check if the machine was booted into safe mode
+	$SafeMode = Get-CimInstance -ClassName Win32_ComputerSystem | Select-Object -ExpandProperty BootupState
+
+	# Fastboot status
+	If ( Test-Path -Path $PowerRegPath ) {
+		$FastStartupVal = Get-ItemProperty -Path $PowerRegPath -Name "HiberbootEnabled" | Select-Object -ExpandProperty HiberbootEnabled
+
+		If ( $FastStartupVal -eq 1 )
+		{
+			$FastStartup = "Enabled"
+		}
+
+		ElseIf ( $FastStartupVal -eq 0 )
+		{
+			$FastStartup = "Disabled"
+		}
+
+		Else
+		{
+			$FastStartUp = "Unknown value $FastStartupVal"
+		}
+	}
+	Else
+	{
+		$FastStartup = "Reg key not found."
+	}
+
+	# Confirm if UEFI is enabled and if SecureBoot is enabled
+	$FirmwareType = Get-FirmwareType
+	
+	# If the system is not using UEFI secureboot is not enabled as it is a UEFI-specific feature
+	If ( $FirmwareType -ne "UEFI" )
+	{
+		$SecureBoot = "Not Enabled"
+	}
+
+	Else
+	{
+		$ErrorActionPreference = 'SilentlyContinue'
+		$SecureBoot = Confirm-SecureBootUEFI | Out-Null
+		$ErrorActionPreference = 'Continue'
+
+		If ( $SecureBoot -eq $True )
+		{
+			$SecureBootStatus = "Enabled"
+		}
+		Else
+		{
+			$SecureBootStatus = "Not Enabled"
+		}
+	}
+
+	$FirmwareInfo =
+	[PSCustomObject]@{
+		"Safe Mode"    = $SafeMode
+		"FastStartup"  = $FastStartup
+		"FirmwareType" = $FirmwareType
+		"SecureBoot"   = $SecureBootStatus
+	}
+
+	$FirmwareInfo
+}
+
+Function Get-CrashDumpSettings
+{
+	Param
+	(
+		[Parameter(Mandatory=$True)]
+		[string]
+		$DestinationPath
+	)
+	
+	$CrashSettings = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
+
+	Write-Output "Getting crash dump settings..."
+	Write-Output "########################## Crash Dump Settings #########################" | Out-File -FilePath $DestinationPath
+	Get-ItemProperty -Path $CrashSettings | Out-File -Append -FilePath $DestinationPath
+
+	$CrashDumpMatrix =
+"
+######################## Crash Dump Type Matrix ########################`r`n`r`n`r`n
+`t`tCrashDumpEnabled`t`t`tFilterPages`r`n
+Disabled`t0`t`t`t`t`t<does not exist>`r`n
+Complete`t1`t`t`t`t`t<does not exist>`r`n
+Active`t`t1`t`t`t`t`t1`r`n
+Kernel`t`t2`t`t`t`t`t<does not exist>`r`n
+Small`t`t3`t`t`t`t`t<does not exist>`r`n
+Automatic`t7`t`t`t`t`t<does not exist>
+"
+
+	Write-Output $CrashDumpMatrix | Out-File -Append -FilePath $DestinationPath
 }
 
 # Combines information from Get-Disk and Get-PhysicalDisk for each disk and outputs it into an array
@@ -134,47 +323,152 @@ Function Get-DiskInformation
 	$DiskInfoArray
 }
 
-# Loop until a process exits for a specified number of seconds, kills the process if the timeout is reached
-Function Wait-Process
+# This script is a modified version of Chris Warwick's original
+Function Get-FirmwareType
+{
+	Add-Type -Language CSharp -TypeDefinition @'
+    using System;
+    using System.Runtime.InteropServices;
+
+    public class FirmwareType
+    {
+        [DllImport("kernel32.dll")]
+        static extern bool GetFirmwareType(ref uint FirmwareType);
+
+        public static uint GetFirmwareType()
+        {
+            uint firmwaretype = 0;
+            if (GetFirmwareType(ref firmwaretype))
+                return firmwaretype;
+            else
+                return 0;   // API call failed, just return 'unknown'
+        }
+    }
+'@
+
+    $Result = [FirmwareType]::GetFirmwareType()
+
+	Switch ($Result)
+	{
+		1		{ Return "BIOS" }
+		2   	{ Return "UEFI" }
+		Default { Return "Unknown - $Result" }
+	}
+}
+
+# Gather information about full memory dumps that exist on the system
+Function Get-FullCrashDumpInfo
 {
 	Param
 	(
 		[Parameter(Mandatory=$True)]
-		$ProcessObject,
+		[ValidateScript({ Test-Path -Path $_ })]
+		[string]
+		$DestinationPath
+	)
+	
+	$CrashSettings    = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
+	$DumpPath         = (Get-ItemProperty -Path $CrashSettings).DumpFile
+	$DefaultPath      = Join-Path -Path $env:SystemRoot -ChildPath "Memory.dmp"
+	$MemoryDumpReport = Join-Path -Path $DestinationPath -ChildPath "memory-dumps.txt"
+	
+	If ( Test-Path -Path $DumpPath )
+	{
+		$DumpPathProperties = Get-Item -Path $DumpPath
+		
+		Write-Output "Crash dump found at $DumpPath" | Out-File -Append -FilePath $MemoryDumpReport
+		Write-Output "Creation date: $((Get-Item -Path $DumpPath).LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
+		Write-Output "Size on disk: $([math]::round($DumpPathProperties.Length / 1MB)) MB" | Out-File -Append -FilePath $MemoryDumpReport
+	}
+
+	Else
+	{
+		Write-Output "$DumpPath was not found" | Out-File -Append -FilePath $MemoryDumpReport
+	}
+
+	If ( $DumpPath -ne $DefaultPath )
+	{
+		If ( Test-Path -Path $DefaultPath )
+		{
+			$DefaultPathProperties = Get-Item -Path $DefaultPath
+			
+			Write-Output "Crash dump found at $DefaultPath" | Out-File -Append -FilePath $MemoryDumpReport
+			Write-Output "Creation date: $((Get-Item -Path $DefaultPath).LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
+			Write-Output "Size on disk: $([math]::round($DefaultPathProperties.Length / 1MB)) MB" | Out-File -Append -FilePath $MemoryDumpReport
+		}
+
+		Else
+		{
+			Write-Output "$DefaultPath was not found" | Out-File -Append -FilePath $MemoryDumpReport
+		}
+	}
+}
+
+# Get information about installed software by looking at the registry
+Function Get-InstalledSoftwareKeys
+{
+    Param
+	(
 		[Parameter(Mandatory=$True)]
 		[string]
-        $ProcessName,
-        [Parameter(Mandatory=$True)]
-        [int]
-        $TimeoutSeconds
+		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
+		$DestinationPath
 	)
+    
+    # Registry locations that contain installed software information
+    $NativeSoftware      = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
+    $Wow6432Software     = "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+    $InstalledComponents = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components"
+    $UserSoftware        = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall"
 
-	$StartTime = Get-Date
+    $SoftwareAttributes = "DisplayName", "DisplayVersion", "Publisher", "InstallDate"
 
-	If ( !$ProcessObject.HasExited )
-	{
-		$StopWatchLoop = [System.Diagnostics.StopWatch]::StartNew()
-		Write-Output "Waiting for $ProcessName to finish..."
-	}
+	# Native software
+	Write-Output "Native Software" | Out-File -FilePath $DestinationPath
 
-	While ( !$ProcessObject.HasExited -and $StartTime.AddSeconds($TimeoutSeconds) -gt (Get-Date) )
-	{
-		Start-Sleep -Milliseconds 500
-		$LoopWaitSec += .5
-	}
+	$NativeKeyProps = Get-RegKeyProps -Path $NativeSoftware
+	
+	$NativeKeyProps = $NativeKeyProps | Select-Object $SoftwareAttributes
+	$NativeKeyProps = $NativeKeyProps | Where-Object { $_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null }
+	$NativeKeyProps = $NativeKeyProps | Sort-Object DisplayName | Format-Table -AutoSize
 
-	If ( !$ProcessObject.HasExited -and $StartTime.AddSeconds($TimeoutSeconds) -le (Get-Date) )
-	{
-		Stop-Process -Force -Id $ProcessObject.Id 2> $null
-		Write-Output "Killed $ProcessName due to $TimeoutSeconds second timeout."
-		Exit
-	}
+	$NativeKeyProps | Out-File -Append -FilePath $DestinationPath
 
-	If ( $StopWatchLoop.IsRunning )
-	{
-		$StopWatchLoop.Stop()
-		Write-Information -MessageData "Waited for $ProcessName for $($StopWatchLoop.Elapsed.TotalSeconds) seconds."
-	}
+	# This only exists if 32-bit software is installed on a 64-bit OS
+    If ( Test-Path -Path $Wow6432Software )
+    {
+		Write-Output "32-bit Software" | Out-File -Append -FilePath $DestinationPath
+
+		$Wow6432KeyProps = Get-RegKeyProps -Path $Wow6432Software
+
+		$Wow6432KeyProps = $Wow6432KeyProps | Select-Object $SoftwareAttributes
+		$Wow6432KeyProps = $Wow6432KeyProps | Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null}
+		$Wow6432KeyProps = $Wow6432KeyProps | Sort-Object DisplayName | Format-Table -AutoSize
+
+		$Wow6432KeyProps | Out-File -Append -FilePath $DestinationPath
+    }
+
+	# Per-user software for the current user
+	Write-Output "User-specific Software" | Out-File -Append -FilePath $DestinationPath
+
+	$UserSoftKeyProps = Get-RegKeyProps -Path $UserSoftware
+
+	$UserSoftKeyProps = $UserSoftKeyProps | Select-Object $SoftwareAttributes 
+	$UserSoftKeyProps = $UserSoftKeyProps | Where-Object {$_.DisplayName -ne $null} 
+	$UserSoftKeyProps = $UserSoftKeyProps | Sort-Object DisplayName | Format-Table -AutoSize
+
+	$UserSoftKeyProps | Out-File -Append -FilePath $DestinationPath
+
+	# Windows components
+	Write-Output "Installed Windows Components" | Out-File -Append -FilePath $DestinationPath
+
+	$ComponentKeyProps = Get-RegKeyProps -Path $InstalledComponents
+	
+	$ComponentKeyProps = $ComponentKeyProps | Select-Object "(Default)", ComponentID, Version, Enabled 
+	$ComponentKeyProps = $ComponentKeyProps | Where-Object {$_."(Default)" -ne $null -or $_.ComponentID -ne $null} 
+	$ComponentKeyProps = $ComponentKeyProps | Sort-Object "(default)" | Format-Table -AutoSize
+
+	$ComponentKeyProps | Out-File -Append -FilePath $DestinationPath
 }
 
 # Get RAM information, decode SMBIOS values into human-readable output
@@ -359,344 +653,65 @@ Function Get-MemoryInfo
 	}
 }
 
-# Checks both the standard path and the registry to see if there was an alternate path specified
-# $CrashesToCollect is a per-folder value
-# In the event both $MinidumpPath and $DefaultPath are not the same folder, and both have $CrashesToCollect or more dump files, it will collect 2 * $CrashesToCollect dumps.
-Function Copy-MiniCrashDumps
-{
-	Param
-	(
-		[Parameter(Mandatory=$True)]
-		[ValidateScript({ Test-Path -Path $_ -PathType Container })]
-		[string]
-		$DestinationPath,
-		[Parameter(Mandatory=$False)]
-		[ValidateRange(1,100)] 
-		[int]
-		$CrashesToCollect = 5
-	)
-
-	$SizeMB = @{Name="Size (MB)";Expression={[math]::Round($_.Length / 1MB, 4)}}
-	$CrashSettings  = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
-	
-	If ( Test-Path -Path $CrashSettings )
-	{
-		$MinidumpPath = (Get-ItemProperty -Path $CrashSettings).MinidumpDir
-	}
-
-	$DefaultPath    = Join-Path -Path $env:SystemRoot -ChildPath "Minidump"
-	$MiniDumpReport = Join-Path -Path $DestinationPath -ChildPath "mini-crash-dumps.txt"
-
-	# Always look where the registry points to for minidumps
-	If ( $MinidumpPath -and (Test-Path -Path $MinidumpPath) )
-	{
-		$Report = Get-ChildItem -Path $MinidumpPath | Sort-Object LastWriteTime -Descending | Select-Object Mode,LastWriteTime,$SizeMB,Name
-		$Report | Out-File -Append -FilePath $MiniDumpReport
-
-		$MiniDumpPathContents = Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath
-
-		If ( $MiniDumpPathContents -ne $null )
-		{
-			Write-Output "Copying crash dumps from $MinidumpPath..."
-			$CrashDumps = Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First $CrashesToCollect
-			$CrashDumps	| ForEach-Object { Copy-Item -Path $_.FullName -Destination "$CrashDumps" }
-		}
-
-		Else
-		{
-			Write-Output "No crash dumps to copy from $MinidumpPath"
-			Write-Output "$MinidumpPath contains no dump files." | Out-File -Append -FilePath $MiniDumpReport
-		}
-	}
-
-	Else
-	{
-		Write-Output "No crash dumps to copy from $MinidumpPath"
-		Write-Output "$MinidumpPath does not exist." | Out-File -Append -FilePath $MiniDumpReport
-	}
-
-	# If the path in the registry and the default minidump path differ, also check the default path for crash dumps.
-	If ( $DefaultPath -ne $MinidumpPath )
-	{
-		If ( Test-Path -Path $DefaultPath )
-		{
-			$Report = Get-ChildItem -Path $DefaultPath | Sort-Object LastWriteTime -Descending | Select-Object Mode,LastWriteTime,$SizeMB,Name
-			$Report	| Out-File -Append -FilePath $MiniDumpReport
-
-			$DefaultPathContents = Get-ChildItem -Filter "*.dmp" -Path $DefaultPath
-
-			If ( $DefaultPathContents -ne $null )
-			{
-				Write-Output "Copying crash dumps from $DefaultPath..."
-				$CrashDumps = Get-ChildItem -Filter "*.dmp" -Path $DefaultPath  | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First $CrashesToCollect
-				$CrashDumps | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$CrashDumps" }
-			}
-
-			Else
-			{
-				Write-Output "No crash dumps to copy from $DefaultPath"
-				Write-Output "$DefaultPath contains no dump files." | Out-File -Append -FilePath $MiniDumpReport
-			}
-		}
-
-		Else
-		{
-			Write-Output "No crash dumps to copy from $DefaultPath"
-			Write-Output "$DefaultPath does not exist." | Out-File -Append -FilePath $MiniDumpReport
-		}
-	}
-}
-
-# This script is a modified version of Chris Warwick's original
-Function Get-FirmwareType
-{
-	Add-Type -Language CSharp -TypeDefinition @'
-    using System;
-    using System.Runtime.InteropServices;
-
-    public class FirmwareType
-    {
-        [DllImport("kernel32.dll")]
-        static extern bool GetFirmwareType(ref uint FirmwareType);
-
-        public static uint GetFirmwareType()
-        {
-            uint firmwaretype = 0;
-            if (GetFirmwareType(ref firmwaretype))
-                return firmwaretype;
-            else
-                return 0;   // API call failed, just return 'unknown'
-        }
-    }
-'@
-
-    $Result = [FirmwareType]::GetFirmwareType()
-
-	Switch ($Result)
-	{
-		1		{ Return "BIOS" }
-		2   	{ Return "UEFI" }
-		Default { Return "Unknown - $Result" }
-	}
-}
-
-Function Get-BootInfo
-{
-	$PowerRegPath =  "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power\"
-
-	# Check if the machine was booted into safe mode
-	$SafeMode = Get-CimInstance -ClassName Win32_ComputerSystem | Select-Object -ExpandProperty BootupState
-
-	# Fastboot status
-	If ( Test-Path -Path $PowerRegPath ) {
-		$FastStartupVal = Get-ItemProperty -Path $PowerRegPath -Name "HiberbootEnabled" | Select-Object -ExpandProperty HiberbootEnabled
-
-		If ( $FastStartupVal -eq 1 )
-		{
-			$FastStartup = "Enabled"
-		}
-
-		ElseIf ( $FastStartupVal -eq 0 )
-		{
-			$FastStartup = "Disabled"
-		}
-
-		Else
-		{
-			$FastStartUp = "Unknown value $FastStartupVal"
-		}
-	}
-	Else
-	{
-		$FastStartup = "Reg key not found."
-	}
-
-	# Confirm if UEFI is enabled and if SecureBoot is enabled
-	$FirmwareType = Get-FirmwareType
-	
-	# If the system is not using UEFI secureboot is not enabled as it is a UEFI-specific feature
-	If ( $FirmwareType -ne "UEFI" )
-	{
-		$SecureBoot = "Not Enabled"
-	}
-
-	Else
-	{
-		$ErrorActionPreference = 'SilentlyContinue'
-		$SecureBoot = Confirm-SecureBootUEFI | Out-Null
-		$ErrorActionPreference = 'Continue'
-
-		If ( $SecureBoot -eq $True )
-		{
-			$SecureBootStatus = "Enabled"
-		}
-		Else
-		{
-			$SecureBootStatus = "Not Enabled"
-		}
-	}
-
-	$FirmwareInfo =
-	[PSCustomObject]@{
-		"Safe Mode"    = $SafeMode
-		"FastStartup"  = $FastStartup
-		"FirmwareType" = $FirmwareType
-		"SecureBoot"   = $SecureBootStatus
-	}
-
-	$FirmwareInfo
-}
-
-# Gather information about full memory dumps that exist on the system
-Function Get-FullCrashDumpInfo
-{
-	Param
-	(
-		[Parameter(Mandatory=$True)]
-		[ValidateScript({ Test-Path -Path $_ })]
-		[string]
-		$DestinationPath
-	)
-	
-	$CrashSettings    = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
-	$DumpPath         = (Get-ItemProperty -Path $CrashSettings).DumpFile
-	$DefaultPath      = Join-Path -Path $env:SystemRoot -ChildPath "Memory.dmp"
-	$MemoryDumpReport = Join-Path -Path $DestinationPath -ChildPath "memory-dumps.txt"
-	
-	If ( Test-Path -Path $DumpPath )
-	{
-		$DumpPathProperties = Get-Item -Path $DumpPath
-		
-		Write-Output "Crash dump found at $DumpPath" | Out-File -Append -FilePath $MemoryDumpReport
-		Write-Output "Creation date: $((Get-Item -Path $DumpPath).LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
-		Write-Output "Size on disk: $([math]::round($DumpPathProperties.Length / 1MB)) MB" | Out-File -Append -FilePath $MemoryDumpReport
-	}
-
-	Else
-	{
-		Write-Output "$DumpPath was not found" | Out-File -Append -FilePath $MemoryDumpReport
-	}
-
-	If ( $DumpPath -ne $DefaultPath )
-	{
-		If ( Test-Path -Path $DefaultPath )
-		{
-			$DefaultPathProperties = Get-Item -Path $DefaultPath
-			
-			Write-Output "Crash dump found at $DefaultPath" | Out-File -Append -FilePath $MemoryDumpReport
-			Write-Output "Creation date: $((Get-Item -Path $DefaultPath).LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
-			Write-Output "Size on disk: $([math]::round($DefaultPathProperties.Length / 1MB)) MB" | Out-File -Append -FilePath $MemoryDumpReport
-		}
-
-		Else
-		{
-			Write-Output "$DefaultPath was not found" | Out-File -Append -FilePath $MemoryDumpReport
-		}
-	}
-}
-
-Function Get-CrashDumpSettings
+# Retrieve and translate information about all detected PnP devices
+Function Get-PnpDeviceInfo
 {
 	Param
 	(
 		[Parameter(Mandatory=$True)]
 		[string]
-		$DestinationPath
-	)
-	
-	$CrashSettings = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
-
-	Write-Output "Getting crash dump settings..."
-	Write-Output "########################## Crash Dump Settings #########################" | Out-File -FilePath $DestinationPath
-	Get-ItemProperty -Path $CrashSettings | Out-File -Append -FilePath $DestinationPath
-
-	$CrashDumpMatrix =
-"
-######################## Crash Dump Type Matrix ########################`r`n`r`n`r`n
-`t`tCrashDumpEnabled`t`t`tFilterPages`r`n
-Disabled`t0`t`t`t`t`t<does not exist>`r`n
-Complete`t1`t`t`t`t`t<does not exist>`r`n
-Active`t`t1`t`t`t`t`t1`r`n
-Kernel`t`t2`t`t`t`t`t<does not exist>`r`n
-Small`t`t3`t`t`t`t`t<does not exist>`r`n
-Automatic`t7`t`t`t`t`t<does not exist>
-"
-
-	Write-Output $CrashDumpMatrix | Out-File -Append -FilePath $DestinationPath
-}
-
-# Download specified remote file with timeout and error handling
-Function Get-RemoteFile
-{
-    Param
-	(
-        [Parameter(Mandatory=$True)]
-        [string]
-		$URL,
-		[Parameter(Mandatory=$True)]
-        [string]
-		$FileName,
-		[Parameter(Mandatory=$True)]
 		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
-        [string]
-		$DestinationPath,
-		[Parameter(Mandatory=$False)]
-		[ValidateRange(1,120)]
-		$TimeoutSeconds = 30
+		$DestinationPath
 	)
-
-    Write-Output "Downloading $FileName..."
-
-	Try
-	{
-		# This removes the progress bar, which slows the download to a crawl if enabled
-		$ProgressPreference = "SilentlyContinue"
-		Invoke-WebRequest -Uri $URL -OutFile $DestinationPath -TimeoutSec $TimeoutSeconds
+	
+	# Translation of Device Manager error codes - for reference see: https://support.microsoft.com/en-us/help/310123/error-codes-in-device-manager-in-windows
+	$DeviceManagerErrorTable =
+	@{
+		1  = "There is no driver installed or the driver is configured incorrectly."
+		3  = "The driver for this device is corrupted or the system is out of resources."
+		9  = "Windows cannot identify this hardware - invalid hardware ID."
+		10 = "The device cannot start."
+		12 = "The device cannot find enough free resources to use"
+		14 = "The device cannot work properly until the system restarts."
+		16 = "Windows cannot identify all the resources this device uses."
+		18 = "Reinstall the drivers for this device."
+		19 = "The device cannot start because its configuration information in the registry is incomplete or damaged."
+		21 = "Windows is in the process of removing the device."
+		22 = "The device was disabled by the user in Device Manager."
+		24 = "This device is not present, is not working properly, or does not have all its drivers installed."
+		28 = "Drivers for this device are not installed."
+		29 = "The device is disabled because the firmware of the device did not give it the required resources."
+		31 = "Windows cannot load the drivers required for this device."
+		32 = "The start type for this driver is set to disabled in the registry."
+		33 = "Cannot determine which resources are required for this device."
+		34 = "Windows cannot determine the settings for this device - manual configuration is required."
+		35 = "The system firmware does not include enough information to properly configure and use this device."
+		36 = "The device is requesting a PCI interrupt but is configured for an ISA interrupt or vice versa."
+		37 = "The driver returned a failure when it executed the DriverEntry routine."
+		38 = "A previous instance of the device driver is still in memory."
+		39 = "The driver for this device is corrupt or missing."
+		40 = "The device's service key information is missing or is incorrect."
+		42 = "A duplicate device was detected."
+		43 = "One of the drivers controlling this device notified Windows that the device failed in some manner."
+		44 = "An application or service has shut down this device."
+		45 = "The device is no longer connected to the computer."
+		46 = "The device is not available because Windows is shutting down."
+		47 = "Windows cannot use this device because it has been prepared for safe removal, but has not been removed."
+		48 = "The driver for this device has been blocked from starting because it is known to have problems with Windows."
+		49 = "The System hive has exceeded the registry size limit - cannot initialize new hardware."
+		50 = "Windows cannot apply all of the properties for this device."
+		51 = "The device is waiting on another device to initialize."
+		52 = "Windows cannot verify the driver's digital signature"
+		53 = "The device has been reserved by the Windows kernel debugger."
+		54 = "The device has failed and is undergoing a reset."
 	}
 
-	Catch
-	{
-		Write-Warning "Failed to download $FileName. Skipping..."
-		Write-Output $error[0]
-
-		# Cleanup if the download fails
-		If ( Test-Path -Path $DestinationPath )
-		{
-			Remove-Item -Path $DestinationPath -Force | Out-Null
-		}
-	}
-}
-
-# Converts all text files in a specified directory to UTF-8
-Function Convert-UTF8
-{
-	Param
-	(
-		[Parameter(Mandatory=$True)]
-		[ValidateScript({ Test-Path -Path $_ })]
-		[string]
-		$Path
-	)
-
-	$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)
-	$Files = Get-ChildItem -Path $Path -Recurse -File -Include "*.txt", "*.wer"
-
-	ForEach ( $File in $Files ) {
-
-		$FilePath = $File.FullName
-
-		$Content = Get-Content -Path $FilePath
-
-		If ( $Content -ne $null )
-		{
-			[System.IO.File]::WriteAllLines($FilePath, $Content, $Utf8NoBomEncoding)
-		}
-
-		Else
-		{
-			# Do nothing as the file is empty
-		}
-	}
+	# List PnP devices and associated information
+	$ErrorCode = @{Name="ErrorCode";Expression={ $_.ConfigManagerErrorCode }}
+	$ErrorText = @{Name="ErrorText";Expression={ $DeviceManagerErrorTable.($_.ConfigManagerErrorCode -as [int]) }}
+	$Attributes = "Name", "Status", $ErrorCode, $ErrorText, "Description", "Manufacturer", "DeviceID"
+	
+	Get-CimInstance -ClassName Win32_PNPEntity | Select-Object $Attributes | Sort-Object Name | Format-Table -AutoSize | Out-File -Append -FilePath $DestinationPath
 }
 
 # We have to implement error handling when using Get-ItemProperty when getting registry key properties , as it can fail if a key is corrupted or was otherwise improperly written.
@@ -761,130 +776,115 @@ Function Get-RegKeyProps
 	Return $null
 }
 
-# Get information about installed software by looking at the registry
-Function Get-InstalledSoftwareKeys
+# Download specified remote file with timeout and error handling
+Function Get-RemoteFile
 {
     Param
 	(
+        [Parameter(Mandatory=$True)]
+        [string]
+		$URL,
 		[Parameter(Mandatory=$True)]
-		[string]
+        [string]
+		$FileName,
+		[Parameter(Mandatory=$True)]
 		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
-		$DestinationPath
+        [string]
+		$DestinationPath,
+		[Parameter(Mandatory=$False)]
+		[ValidateRange(1,120)]
+		$TimeoutSeconds = 30
 	)
-    
-    # Registry locations that contain installed software information
-    $NativeSoftware      = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
-    $Wow6432Software     = "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
-    $InstalledComponents = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components"
-    $UserSoftware        = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall"
 
-    $SoftwareAttributes = "DisplayName", "DisplayVersion", "Publisher", "InstallDate"
+    Write-Output "Downloading $FileName..."
 
-	# Native software
-	Write-Output "Native Software" | Out-File -FilePath $DestinationPath
+	Try
+	{
+		# This removes the progress bar, which slows the download to a crawl if enabled
+		$ProgressPreference = "SilentlyContinue"
+		Invoke-WebRequest -Uri $URL -OutFile $DestinationPath -TimeoutSec $TimeoutSeconds
+	}
 
-	$NativeKeyProps = Get-RegKeyProps -Path $NativeSoftware
-	
-	$NativeKeyProps = $NativeKeyProps | Select-Object $SoftwareAttributes
-	$NativeKeyProps = $NativeKeyProps | Where-Object { $_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null }
-	$NativeKeyProps = $NativeKeyProps | Sort-Object DisplayName | Format-Table -AutoSize
+	Catch
+	{
+		Write-Warning "Failed to download $FileName. Skipping..."
+		Write-Output $error[0]
 
-	$NativeKeyProps | Out-File -Append -FilePath $DestinationPath
-
-	# This only exists if 32-bit software is installed on a 64-bit OS
-    If ( Test-Path -Path $Wow6432Software )
-    {
-		Write-Output "32-bit Software" | Out-File -Append -FilePath $DestinationPath
-
-		$Wow6432KeyProps = Get-RegKeyProps -Path $Wow6432Software
-
-		$Wow6432KeyProps = $Wow6432KeyProps | Select-Object $SoftwareAttributes
-		$Wow6432KeyProps = $Wow6432KeyProps | Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null}
-		$Wow6432KeyProps = $Wow6432KeyProps | Sort-Object DisplayName | Format-Table -AutoSize
-
-		$Wow6432KeyProps | Out-File -Append -FilePath $DestinationPath
-    }
-
-	# Per-user software for the current user
-	Write-Output "User-specific Software" | Out-File -Append -FilePath $DestinationPath
-
-	$UserSoftKeyProps = Get-RegKeyProps -Path $UserSoftware
-
-	$UserSoftKeyProps = $UserSoftKeyProps | Select-Object $SoftwareAttributes 
-	$UserSoftKeyProps = $UserSoftKeyProps | Where-Object {$_.DisplayName -ne $null} 
-	$UserSoftKeyProps = $UserSoftKeyProps | Sort-Object DisplayName | Format-Table -AutoSize
-
-	$UserSoftKeyProps | Out-File -Append -FilePath $DestinationPath
-
-	# Windows components
-	Write-Output "Installed Windows Components" | Out-File -Append -FilePath $DestinationPath
-
-	$ComponentKeyProps = Get-RegKeyProps -Path $InstalledComponents
-	
-	$ComponentKeyProps = $ComponentKeyProps | Select-Object "(Default)", ComponentID, Version, Enabled 
-	$ComponentKeyProps = $ComponentKeyProps | Where-Object {$_."(Default)" -ne $null -or $_.ComponentID -ne $null} 
-	$ComponentKeyProps = $ComponentKeyProps | Sort-Object "(default)" | Format-Table -AutoSize
-
-	$ComponentKeyProps | Out-File -Append -FilePath $DestinationPath
+		# Cleanup if the download fails
+		If ( Test-Path -Path $DestinationPath )
+		{
+			Remove-Item -Path $DestinationPath -Force | Out-Null
+		}
+	}
 }
 
-# Retrieve and translate information about all detected PnP devices
-Function Get-PnpDeviceInfo
+# Allows us to map drive letters to disk paths in the NT Object Manager namespace
+Function Import-DriveInformation
+{
+$DiskInfoCode =
+@'
+
+Public Class DiskInfo
+	Private Declare Function QueryDosDevice Lib "kernel32" Alias "QueryDosDeviceA" (ByVal lpDeviceName As String, ByVal lpTargetPath As String, ByVal ucchMax As Long) As Long
+
+	Shared Function GetDeviceName(sDisk As String) As String
+
+		Dim sDevice As String = New String(" ",50)
+
+		If QueryDosDevice(sDisk, sDevice, sDevice.Length) Then
+			Return sDevice
+
+		Else
+			Throw New System.Exception("sDisk value not found - not a disk.")
+
+		End If
+	End Function
+End Class
+
+'@
+
+	Add-Type $DiskInfoCode -Language VisualBasic
+}
+
+# Loop until a process exits for a specified number of seconds, kills the process if the timeout is reached
+Function Wait-Process
 {
 	Param
 	(
 		[Parameter(Mandatory=$True)]
+		$ProcessObject,
+		[Parameter(Mandatory=$True)]
 		[string]
-		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
-		$DestinationPath
+        $ProcessName,
+        [Parameter(Mandatory=$True)]
+        [int]
+        $TimeoutSeconds
 	)
-	
-	# Translation of Device Manager error codes - for reference see: https://support.microsoft.com/en-us/help/310123/error-codes-in-device-manager-in-windows
-	$DeviceManagerErrorTable =
-	@{
-		1  = "There is no driver installed or the driver is configured incorrectly."
-		3  = "The driver for this device is corrupted or the system is out of resources."
-		9  = "Windows cannot identify this hardware - invalid hardware ID."
-		10 = "The device cannot start."
-		12 = "The device cannot find enough free resources to use"
-		14 = "The device cannot work properly until the system restarts."
-		16 = "Windows cannot identify all the resources this device uses."
-		18 = "Reinstall the drivers for this device."
-		19 = "The device cannot start because its configuration information in the registry is incomplete or damaged."
-		21 = "Windows is in the process of removing the device."
-		22 = "The device was disabled by the user in Device Manager."
-		24 = "This device is not present, is not working properly, or does not have all its drivers installed."
-		28 = "Drivers for this device are not installed."
-		29 = "The device is disabled because the firmware of the device did not give it the required resources."
-		31 = "Windows cannot load the drivers required for this device."
-		32 = "The start type for this driver is set to disabled in the registry."
-		33 = "Cannot determine which resources are required for this device."
-		34 = "Windows cannot determine the settings for this device - manual configuration is required."
-		35 = "The system firmware does not include enough information to properly configure and use this device."
-		36 = "The device is requesting a PCI interrupt but is configured for an ISA interrupt or vice versa."
-		37 = "The driver returned a failure when it executed the DriverEntry routine."
-		38 = "A previous instance of the device driver is still in memory."
-		39 = "The driver for this device is corrupt or missing."
-		40 = "The device's service key information is missing or is incorrect."
-		42 = "A duplicate device was detected."
-		43 = "One of the drivers controlling this device notified Windows that the device failed in some manner."
-		44 = "An application or service has shut down this device."
-		45 = "The device is no longer connected to the computer."
-		46 = "The device is not available because Windows is shutting down."
-		47 = "Windows cannot use this device because it has been prepared for safe removal, but has not been removed."
-		48 = "The driver for this device has been blocked from starting because it is known to have problems with Windows."
-		49 = "The System hive has exceeded the registry size limit - cannot initialize new hardware."
-		50 = "Windows cannot apply all of the properties for this device."
-		51 = "The device is waiting on another device to initialize."
-		52 = "Windows cannot verify the driver's digital signature"
-		53 = "The device has been reserved by the Windows kernel debugger."
-		54 = "The device has failed and is undergoing a reset."
+
+	$StartTime = Get-Date
+
+	If ( !$ProcessObject.HasExited )
+	{
+		$StopWatchLoop = [System.Diagnostics.StopWatch]::StartNew()
+		Write-Output "Waiting for $ProcessName to finish..."
 	}
 
-	# List PnP devices and associated information
-	$ErrorCode = @{Name="ErrorCode";Expression={ $_.ConfigManagerErrorCode }}
-	$ErrorText = @{Name="ErrorText";Expression={ $DeviceManagerErrorTable.($_.ConfigManagerErrorCode -as [int]) }}
-	$Attributes = "Name", "Status", $ErrorCode, $ErrorText, "Description", "Manufacturer", "DeviceID"
-	
-	Get-CimInstance -ClassName Win32_PNPEntity | Select-Object $Attributes | Sort-Object Name | Format-Table -AutoSize | Out-File -Append -FilePath $DestinationPath
+	While ( !$ProcessObject.HasExited -and $StartTime.AddSeconds($TimeoutSeconds) -gt (Get-Date) )
+	{
+		Start-Sleep -Milliseconds 500
+		$LoopWaitSec += .5
+	}
+
+	If ( !$ProcessObject.HasExited -and $StartTime.AddSeconds($TimeoutSeconds) -le (Get-Date) )
+	{
+		Stop-Process -Force -Id $ProcessObject.Id 2> $null
+		Write-Output "Killed $ProcessName due to $TimeoutSeconds second timeout."
+		Exit
+	}
+
+	If ( $StopWatchLoop.IsRunning )
+	{
+		$StopWatchLoop.Stop()
+		Write-Information -MessageData "Waited for $ProcessName for $($StopWatchLoop.Elapsed.TotalSeconds) seconds."
+	}
 }
