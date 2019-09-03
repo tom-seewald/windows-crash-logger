@@ -6,7 +6,7 @@
 $ErrorActionPreference = 'Stop'
 
 # Version String
-$ScriptVersion = "V2 Log Collector 1.03 - 9/02/19"
+$ScriptVersion = "V2 Log Collector 1.03 - 9/03/19"
 
 # Default to UTF-8 output
 $PSDefaultParameterValues['*:Encoding'] = 'UTF8'
@@ -290,7 +290,7 @@ Write-Output "Checking power settings..."
 
 # RAM info
 Write-Output "Getting hardware information..."
-Get-MemoryInfo | Out-File -FilePath $RAM
+Get-MemoryInfo | Format-List | Out-File -FilePath $RAM
 
 # Processor information
 $ProcessorAttributes = "Name", "Description", "Manufacturer", "DeviceID", "SocketDesignation", "CurrentClockSpeed", "CPUStatus", `

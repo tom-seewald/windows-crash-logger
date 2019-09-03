@@ -128,7 +128,7 @@ Get-DiskInformation | Out-File -FilePath $Disks
 
 # List PnP devices and associated information
 Write-Output "Listing PnP devices..."
-Get-PnPDeviceInfo -DestinationPath $PnpDevices
+Get-PnPDeviceInfo | Format-Table -AutoSize | Out-File -Append -FilePath $PnpDevices
 
 # List all processes
 Write-Output "Enumerating running processes..."

@@ -221,7 +221,7 @@ Function Get-BootInfo
 		"SecureBoot"   = $SecureBootStatus
 	}
 
-	$FirmwareInfo
+	Return $FirmwareInfo
 }
 
 Function Get-CrashDumpSettings
@@ -329,7 +329,7 @@ Function Get-DiskInformation
 		$DiskInfoArray.Add($DiskInformation) | Out-Null
 	}
 
-	$DiskInfoArray
+	Return $DiskInfoArray
 }
 
 # This script is a modified version of Chris Warwick's original
@@ -577,6 +577,7 @@ Function Get-MemoryInfo
 	}
 
 	$PhysicalMemory = Get-CimInstance -ClassName Win32_PhysicalMemory
+	$DIMMArray = New-Object System.Collections.ArrayList
 
 	# Loop through each DIMM
 	ForEach ( $DIMM in $PhysicalMemory )
@@ -648,8 +649,7 @@ Function Get-MemoryInfo
 		}
 
 		# Construct object containing gathered information
-		$DIMMInfo =
-		[PSCustomObject]@{
+		$DIMMInfo = [PSCustomObject]@{
 			"Location"	   = $DIMM.DeviceLocator
 			"BankLabel"	   = $DIMM.BankLabel
 			"Manufacturer" = $DIMM.Manufacturer
@@ -663,21 +663,15 @@ Function Get-MemoryInfo
 			"TypeDetail"   = $TypeDetailArray
 		}
 
-		$DIMMInfo
+		$DIMMArray.Add($DIMMInfo) | Out-Null
 	}
+	
+	Return $DIMMArray
 }
 
 # Retrieve and translate information about all detected PnP devices
 Function Get-PnpDeviceInfo
 {
-	Param
-	(
-		[Parameter(Mandatory=$True)]
-		[string]
-		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
-		$DestinationPath
-	)
-	
 	# Translation of Device Manager error codes - for reference see: https://support.microsoft.com/en-us/help/310123/error-codes-in-device-manager-in-windows
 	$DeviceManagerErrorTable =
 	@{
@@ -725,7 +719,8 @@ Function Get-PnpDeviceInfo
 	$ErrorText = @{Name="ErrorText";Expression={ $DeviceManagerErrorTable.($_.ConfigManagerErrorCode -as [int]) }}
 	$Attributes = "Name", "Status", $ErrorCode, $ErrorText, "Description", "Manufacturer", "DeviceID"
 	
-	Get-CimInstance -ClassName Win32_PNPEntity | Select-Object $Attributes | Sort-Object Name | Format-Table -AutoSize | Out-File -Append -FilePath $DestinationPath
+	$PnpDevices = Get-CimInstance -ClassName Win32_PNPEntity | Select-Object $Attributes | Sort-Object Name
+	Return $PnpDevices
 }
 
 # We have to implement error handling when using Get-ItemProperty when getting registry key properties , as it can fail if a key is corrupted or was otherwise improperly written.
