@@ -16,7 +16,7 @@ Function Compress-Folder
 		[string]
 		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
 		$DestinationPath
-    )
+	)
 
 	Try
 	{
@@ -336,10 +336,10 @@ Function Get-DiskInformation
 Function Get-FirmwareType
 {
 	Add-Type -Language CSharp -TypeDefinition @'
-    using System;
-    using System.Runtime.InteropServices;
+	using System;
+	using System.Runtime.InteropServices;
 
-    public class FirmwareType
+	public class FirmwareType
     {
         [DllImport("kernel32.dll")]
         static extern bool GetFirmwareType(ref uint FirmwareType);
@@ -837,21 +837,21 @@ Function Get-RemoteFile
 Function Get-VolumeInfo
 {
 $Signature = @'
-[DllImport("kernel32.dll", SetLastError=true)]
-[return: MarshalAs(UnmanagedType.Bool)]
-public static extern bool GetVolumePathNamesForVolumeNameW([MarshalAs(UnmanagedType.LPWStr)] string lpszVolumeName,
-		[MarshalAs(UnmanagedType.LPWStr)] [Out] StringBuilder lpszVolumeNamePaths, uint cchBuferLength, 
-		ref UInt32 lpcchReturnLength);
+	[DllImport("kernel32.dll", SetLastError=true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	public static extern bool GetVolumePathNamesForVolumeNameW([MarshalAs(UnmanagedType.LPWStr)] string lpszVolumeName,
+			[MarshalAs(UnmanagedType.LPWStr)] [Out] StringBuilder lpszVolumeNamePaths, uint cchBuferLength, 
+			ref UInt32 lpcchReturnLength);
 
-[DllImport("kernel32.dll", SetLastError = true)]
-public static extern IntPtr FindFirstVolume([Out] StringBuilder lpszVolumeName,
-   uint cchBufferLength);
+	[DllImport("kernel32.dll", SetLastError = true)]
+	public static extern IntPtr FindFirstVolume([Out] StringBuilder lpszVolumeName,
+	   uint cchBufferLength);
 
-[DllImport("kernel32.dll", SetLastError = true)]
-public static extern bool FindNextVolume(IntPtr hFindVolume, [Out] StringBuilder lpszVolumeName, uint cchBufferLength);
+	[DllImport("kernel32.dll", SetLastError = true)]
+	public static extern bool FindNextVolume(IntPtr hFindVolume, [Out] StringBuilder lpszVolumeName, uint cchBufferLength);
 
-[DllImport("kernel32.dll", SetLastError = true)]
-public static extern uint QueryDosDevice(string lpDeviceName, StringBuilder lpTargetPath, int ucchMax);
+	[DllImport("kernel32.dll", SetLastError = true)]
+	public static extern uint QueryDosDevice(string lpDeviceName, StringBuilder lpTargetPath, int ucchMax);
 '@
 
 	Add-Type -MemberDefinition $Signature -Name Win32Utils -Namespace PInvoke -Using PInvoke,System.Text;
