@@ -2,6 +2,9 @@
 # Script Written By Spectrum #
 ##############################
 
+# Any errors at the start should be treated as fatal
+$ErrorActionPreference = 'Stop'
+
 # Version String
 $ScriptVersion = "V2 Log Collector 1.03 - 9/02/19"
 
@@ -148,17 +151,7 @@ Start-Transcript -Path $Transcript -Force | Out-Null
 Write-Information -MessageData $ScriptVersion
 
 # Import custom module containing support functions
-Try
-{
-    Import-Module $LoggerModule
-}
-
-Catch
-{
-    Write-Warning "Failed to import $LoggerModule."
-    Write-Output $error[0]
-    Return "Script cannot continue."
-}
+Import-Module $LoggerModule
 
 # Set window size to 1000 by 1000 to avoid truncation when sending output to files
 $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(1000,1000)
@@ -175,19 +168,12 @@ If ( Test-Path -Path $Zip )
 }
 
 # Create directories and files
-Try
-{
-	New-Item -ItemType Directory -Path $Path -Force | Out-Null
-	New-Item -ItemType Directory -Path $EventLogs | Out-Null
-	New-Item -ItemType Directory -Path $PowerReports | Out-Null
-}
+New-Item -ItemType Directory -Path $Path -Force | Out-Null
+New-Item -ItemType Directory -Path $EventLogs | Out-Null
+New-Item -ItemType Directory -Path $PowerReports | Out-Null
 
-Catch
-{
-	Write-Warning "Unable to create required output directories."
-	Write-Output $error[0]
-	Return "Script cannot continue."
-}
+# End of "critical" area, errors will now default to being non-fatal
+$ErrorActionPreference = 'Continue'
 
 # Check that the OS is supported, warn if it is not
 If ( $WindowsBuild -lt $Win81Build )

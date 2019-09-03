@@ -10,6 +10,9 @@ Param
 	$Path
 )
 
+# Any errors at the start should be treated as fatal
+$ErrorActionPreference = 'Stop'
+
 # Track execution time of the script
 $StopWatchElevated = [System.Diagnostics.StopWatch]::StartNew()
 
@@ -66,22 +69,16 @@ $VerifierPath = Join-Path -Path $System32 -ChildPath "verifier.exe"
 # Begin logging
 Start-Transcript -Path $Transcript -Force | Out-Null
 
+# Import custom module containing support functions
+$ErrorActionPreference = 'Stop'
+Import-Module $LoggerModule
+
 # Create folders, power reports has already been created by main.ps1
 New-Item -ItemType Directory $CrashDumps -Force -ErrorAction Stop | Out-Null
 New-Item -ItemType Directory $WER -Force -ErrorAction Stop | Out-Null
 
-# Import custom module containing support functions
-Try
-{
-    Import-Module $LoggerModule
-}
-
-Catch
-{
-	Write-Warning "Failed to import $LoggerModule."
-	Write-Output $error[0]
-    Return "Script cannot continue."
-}
+# End of "critical" area, errors will now default to being non-fatal
+$ErrorActionPreference = 'Continue'
 
 # Check that this script is being run with elevated credentials, e.g. Administrator, SYSTEM, or TrustedInstaller
 $ElevatedCheck = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
