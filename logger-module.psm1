@@ -1,4 +1,7 @@
-﻿# This is used instead of the built-in "Compress-Archive" cmdlet for serveral reasons
+﻿# Default to UTF-8 output
+$PSDefaultParameterValues['*:Encoding'] = 'UTF8'
+
+# This is used instead of the built-in "Compress-Archive" cmdlet for serveral reasons
 # 1. Using .NET directly results in faster compression
 # 2. Windows 8.1/Server 2012R2 does not have that cmdlet by default, since they ship with PowerShell 4.0
 Function Compress-Folder
@@ -107,11 +110,16 @@ Function Get-DiskInformation
 			$SizeGB = [math]::Round($PhysicalDisk.Size / 1GB, 2)
 		}
 		
+		If ( $Disk.SerialNumber )
+		{
+			$Serial = $Disk.SerialNumber.Trim()
+		}
+		
 		$DiskInformation =
 		[PSCustomObject]@{
 			"Model"			  = $Disk.Model;
 			"Manufacturer"	  = $Disk.Manufacturer;
-			"SerialNumber"	  = $Disk.SerialNumber;
+			"SerialNumber"	  = $Serial;
 			"MediaType"		  = $PhysicalDisk.MediaType;
 			"BusType"		  = $PhysicalDisk.BusType;
 			"BootDrive"		  = $Disk.IsBoot;
@@ -809,4 +817,65 @@ Function Get-InstalledSoftwareKeys
 	$ComponentKeyProps = $ComponentKeyProps | Sort-Object "(default)" | Format-Table -AutoSize
 
 	$ComponentKeyProps | Out-File -Append -FilePath $DestinationPath
+}
+
+# Retrieve and translate information about all detected PnP devices
+Function Get-PnpDeviceInfo
+{
+	Param
+	(
+		[Parameter(Mandatory=$True)]
+		[string]
+		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
+		$DestinationPath
+	)
+	
+	# Translation of Device Manager error codes - for reference see: https://support.microsoft.com/en-us/help/310123/error-codes-in-device-manager-in-windows
+	$DeviceManagerErrorTable =
+	@{
+		1  = "There is no driver installed or the driver is configured incorrectly."
+		3  = "The driver for this device is corrupted or the system is out of resources."
+		9  = "Windows cannot identify this hardware - invalid hardware ID."
+		10 = "The device cannot start."
+		12 = "The device cannot find enough free resources to use"
+		14 = "The device cannot work properly until the system restarts."
+		16 = "Windows cannot identify all the resources this device uses."
+		18 = "Reinstall the drivers for this device."
+		19 = "The device cannot start because its configuration information in the registry is incomplete or damaged."
+		21 = "Windows is in the process of removing the device."
+		22 = "The device was disabled by the user in Device Manager."
+		24 = "This device is not present, is not working properly, or does not have all its drivers installed."
+		28 = "Drivers for this device are not installed."
+		29 = "The device is disabled because the firmware of the device did not give it the required resources."
+		31 = "Windows cannot load the drivers required for this device."
+		32 = "The start type for this driver is set to disabled in the registry."
+		33 = "Cannot determine which resources are required for this device."
+		34 = "Windows cannot determine the settings for this device - manual configuration is required."
+		35 = "The system firmware does not include enough information to properly configure and use this device."
+		36 = "The device is requesting a PCI interrupt but is configured for an ISA interrupt or vice versa."
+		37 = "The driver returned a failure when it executed the DriverEntry routine."
+		38 = "A previous instance of the device driver is still in memory."
+		39 = "The driver for this device is corrupt or missing."
+		40 = "The device's service key information is missing or is incorrect."
+		42 = "A duplicate device was detected."
+		43 = "One of the drivers controlling this device notified Windows that the device failed in some manner."
+		44 = "An application or service has shut down this device."
+		45 = "The device is no longer connected to the computer."
+		46 = "The device is not available because Windows is shutting down."
+		47 = "Windows cannot use this device because it has been prepared for safe removal, but has not been removed."
+		48 = "The driver for this device has been blocked from starting because it is known to have problems with Windows."
+		49 = "The System hive has exceeded the registry size limit - cannot initialize new hardware."
+		50 = "Windows cannot apply all of the properties for this device."
+		51 = "The device is waiting on another device to initialize."
+		52 = "Windows cannot verify the driver's digital signature"
+		53 = "The device has been reserved by the Windows kernel debugger."
+		54 = "The device has failed and is undergoing a reset."
+	}
+
+	# List PnP devices and associated information
+	$ErrorCode = @{Name="ErrorCode";Expression={ $_.ConfigManagerErrorCode }}
+	$ErrorText = @{Name="ErrorText";Expression={ $DeviceManagerErrorTable.($_.ConfigManagerErrorCode -as [int]) }}
+	$Attributes = "Name", "Status", $ErrorCode, $ErrorText, "Description", "Manufacturer", "DeviceID"
+	
+	Get-CimInstance -ClassName Win32_PNPEntity | Select-Object $Attributes | Sort-Object Name | Format-Table -AutoSize | Out-File -Append -FilePath $DestinationPath
 }
