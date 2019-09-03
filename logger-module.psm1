@@ -832,32 +832,70 @@ Function Get-RemoteFile
 	}
 }
 
-# Allows us to map drive letters to disk paths in the NT Object Manager namespace
-Function Import-DriveInformation
+# Originally from: phant0m - https://superuser.com/questions/1058217/list-every-device-harddiskvolume
+# Returns Volume information, including the actual device path of the volume in the object manager along with the associated drive letter
+Function Get-VolumeInfo
 {
-$DiskInfoCode =
-@'
+$Signature = @'
+[DllImport("kernel32.dll", SetLastError=true)]
+[return: MarshalAs(UnmanagedType.Bool)]
+public static extern bool GetVolumePathNamesForVolumeNameW([MarshalAs(UnmanagedType.LPWStr)] string lpszVolumeName,
+		[MarshalAs(UnmanagedType.LPWStr)] [Out] StringBuilder lpszVolumeNamePaths, uint cchBuferLength, 
+		ref UInt32 lpcchReturnLength);
 
-Public Class DiskInfo
-	Private Declare Function QueryDosDevice Lib "kernel32" Alias "QueryDosDeviceA" (ByVal lpDeviceName As String, ByVal lpTargetPath As String, ByVal ucchMax As Long) As Long
+[DllImport("kernel32.dll", SetLastError = true)]
+public static extern IntPtr FindFirstVolume([Out] StringBuilder lpszVolumeName,
+   uint cchBufferLength);
 
-	Shared Function GetDeviceName(sDisk As String) As String
+[DllImport("kernel32.dll", SetLastError = true)]
+public static extern bool FindNextVolume(IntPtr hFindVolume, [Out] StringBuilder lpszVolumeName, uint cchBufferLength);
 
-		Dim sDevice As String = New String(" ",50)
-
-		If QueryDosDevice(sDisk, sDevice, sDevice.Length) Then
-			Return sDevice
-
-		Else
-			Throw New System.Exception("sDisk value not found - not a disk.")
-
-		End If
-	End Function
-End Class
-
+[DllImport("kernel32.dll", SetLastError = true)]
+public static extern uint QueryDosDevice(string lpDeviceName, StringBuilder lpTargetPath, int ucchMax);
 '@
 
-	Add-Type $DiskInfoCode -Language VisualBasic
+	Add-Type -MemberDefinition $Signature -Name Win32Utils -Namespace PInvoke -Using PInvoke,System.Text;
+
+	$lpcchReturnLength = 0;
+	$Max = 65535
+
+	$VolumeName   = New-Object System.Text.StringBuilder($Max, $Max)
+	$PathName     = New-Object System.Text.StringBuilder($Max, $Max)
+	$MountPoint   = New-Object System.Text.StringBuilder($Max, $Max)
+	$VolumeHandle = [PInvoke.Win32Utils]::FindFirstVolume($VolumeName, $Max)
+
+	$VolumeArray = New-Object System.Collections.ArrayList
+
+	$VolumeWMI = Get-CimInstance -ClassName Win32_Volume
+
+	Do
+	{
+		$Volume = $VolumeName.ToString()
+		$Unused = [PInvoke.Win32Utils]::GetVolumePathNamesForVolumeNameW($Volume, $MountPoint, $Max, [Ref] $lpcchReturnLength);
+		$ReturnLength = [PInvoke.Win32Utils]::QueryDosDevice($Volume.Substring(4, $Volume.Length - 1 - 4), $PathName, [UInt32] $Max);
+		
+		If ( $ReturnLength )
+		{
+			$VolumeInstance = $VolumeWMI | Where-Object { $_.DeviceID -eq $Volume }
+			
+			$VolumeInformation = [PSCustomObject]@{
+				DriveLetter = $MountPoint.ToString()
+				DevicePath  = $PathName.ToString()
+				VolumeGUID  = $Volume
+				"Size (GB)"  = [math]::Round($VolumeInstance.Capacity / 1GB, 2)
+				"Free (GB)"  = [math]::Round($VolumeInstance.FreeSpace / 1GB, 2)
+			}
+
+			$VolumeArray.Add($VolumeInformation) | Out-Null
+		}
+		
+		Else
+		{
+			Write-Output "No mountpoint found for: " + $volume
+		}
+	} While ( [PInvoke.Win32Utils]::FindNextVolume([IntPtr] $VolumeHandle, $VolumeName, $Max) )
+
+	Return $VolumeArray
 }
 
 # Loop until a process exits for a specified number of seconds, kills the process if the timeout is reached
