@@ -5,11 +5,11 @@ Function Compress-Folder
 {
 	Param
 	(
-		[parameter(Mandatory=$True)]
+		[Parameter(Mandatory=$True)]
 		[string]
 		[ValidateScript({ Test-Path -Path $_ })]
 		$Path,
-		[parameter(Mandatory=$True)]
+		[Parameter(Mandatory=$True)]
 		[string]
 		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
 		$DestinationPath
@@ -107,11 +107,16 @@ Function Get-DiskInformation
 			$SizeGB = [math]::Round($PhysicalDisk.Size / 1GB, 2)
 		}
 		
+		If ( $Disk.SerialNumber )
+		{
+			$Serial = $Disk.SerialNumber.Trim()
+		}
+		
 		$DiskInformation =
 		[PSCustomObject]@{
 			"Model"			  = $Disk.Model;
 			"Manufacturer"	  = $Disk.Manufacturer;
-			"SerialNumber"	  = $Disk.SerialNumber;
+			"SerialNumber"	  = $Serial;
 			"MediaType"		  = $PhysicalDisk.MediaType;
 			"BusType"		  = $PhysicalDisk.BusType;
 			"BootDrive"		  = $Disk.IsBoot;
@@ -131,12 +136,12 @@ Function Wait-Process
 {
 	Param
 	(
-		[parameter(Mandatory=$True)]
+		[Parameter(Mandatory=$True)]
 		$ProcessObject,
-		[parameter(Mandatory=$True)]
+		[Parameter(Mandatory=$True)]
 		[string]
         $ProcessName,
-        [parameter(Mandatory=$True)]
+        [Parameter(Mandatory=$True)]
         [int]
         $TimeoutSeconds
 	)
@@ -301,27 +306,34 @@ Function Get-MemoryInfo
 		}
 
 		# Get TypeDetail and convert it
-		$TypeDetail         = $DIMM.TypeDetail
-		$TypeDetailBitField = [Convert]::ToString($TypeDetail,2)
-		$BitFieldLength     = $TypeDetailBitField | Measure-Object -Character | Select-Object -ExpandProperty Characters
-
-		# Reverse bitfield, as PowerShell defaults to left to right for significant digits in binary
-		$TypeDetailBitField = ([regex]::Matches($TypeDetailBitField,'.','RightToLeft') | ForEach-Object {$_.value}) -join ''
-
-		$TypeDetailArray = @()
-
-		# Loop through each bit in $TypeDetailBitField, convert every matching entry to a human-readable label
-		for ( $i=0; $i -le ($BitFieldLength - 1); $i++ )
+		If ( $DIMM.TypeDetail )
 		{
-			If ( $TypeDetailBitField[$i] -eq "1" )
+			$TypeDetailBitField = [Convert]::ToString($DIMM.TypeDetail,2)
+			$BitFieldLength     = $TypeDetailBitField | Measure-Object -Character | Select-Object -ExpandProperty Characters
+
+			# Reverse bitfield, as PowerShell defaults to left to right for significant digits in binary
+			$TypeDetailBitField = ([regex]::Matches($TypeDetailBitField,'.','RightToLeft') | ForEach-Object {$_.value}) -join ''
+
+			$TypeDetailArray = @()
+
+			# Loop through each bit in $TypeDetailBitField, convert every matching entry to a human-readable label
+			for ( $i=0; $i -le ($BitFieldLength - 1); $i++ )
 			{
-				$TypeDetailArray += $TypeDetailHashTable.$i
+				If ( $TypeDetailBitField[$i] -eq "1" )
+				{
+					$TypeDetailArray += $TypeDetailHashTable.$i
+				}
+			}
+
+			If ( !$TypeDetailArray )
+			{
+				$TypeDetailArray += $TypeDetailBitField
 			}
 		}
 
-		If ( !$TypeDetailArray )
+		Else
 		{
-			$TypeDetailArray += $TypeDetailBitField
+			$TypeDetailArray = "Dimm.TypeDetail field was null."
 		}
 
 		# Construct object containing gathered information
@@ -361,6 +373,7 @@ Function Copy-MiniCrashDumps
 		$CrashesToCollect = 5
 	)
 
+	# TODO: Check if $CrashSettings exists, then check if $miniDumpPath is not $null before continuing
 	$CrashSettings  = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
 	$MinidumpPath   = (Get-ItemProperty -Path $CrashSettings).MinidumpDir
 	$DefaultPath    = Join-Path -Path $env:SystemRoot -ChildPath "Minidump"
@@ -445,14 +458,13 @@ Function Get-FirmwareType
     }
 '@
 
-
     $Result = [FirmwareType]::GetFirmwareType()
 
 	Switch ($Result)
 	{
-		1		{Return "BIOS"}
-		2   	{Return "UEFI"}
-		Default {Return "Unknown - $Result"}
+		1		{ Return "BIOS" }
+		2   	{ Return "UEFI" }
+		Default { Return "Unknown - $Result" }
 	}
 }
 
@@ -606,17 +618,17 @@ Function Get-RemoteFile
 {
     Param
 	(
-        [parameter(Mandatory=$True)]
+        [Parameter(Mandatory=$True)]
         [string]
 		$URL,
-		[parameter(Mandatory=$True)]
+		[Parameter(Mandatory=$True)]
         [string]
 		$FileName,
-		[parameter(Mandatory=$True)]
+		[Parameter(Mandatory=$True)]
 		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
         [string]
 		$DestinationPath,
-		[parameter(Mandatory=$False)]
+		[Parameter(Mandatory=$False)]
 		[ValidateRange(1,120)]
 		$TimeoutSeconds = 30
 	)
@@ -714,16 +726,14 @@ Function Get-RegKeyProps
 				{
 					Get-ItemProperty -LiteralPath $Key.PSPath | Out-Null 
 				}
-				Catch# Set window size to 1000 by 1000 to avoid truncation when sending output to files
-$Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(1000,1000)
-
+				Catch
 				{
 					$BadKey = $Key.PSPath
 					break;
 				}
 			}
 
-			Write-Information -MessageData  "Bad registry key found: $BadKey"
+			Write-Information -MessageData "Bad registry key found: $BadKey"
 			
 			# Remove $BadKey from the list of registry keys to look at in the next loop
 			$RegKeys = $RegKeys | Where-Object { $BadKey -NotContains $_.PSPath }
@@ -744,7 +754,7 @@ Function Get-InstalledSoftwareKeys
 {
     Param
 	(
-		[parameter(Mandatory=$True)]
+		[Parameter(Mandatory=$True)]
 		[string]
 		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
 		$DestinationPath
