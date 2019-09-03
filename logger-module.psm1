@@ -107,16 +107,11 @@ Function Get-DiskInformation
 			$SizeGB = [math]::Round($PhysicalDisk.Size / 1GB, 2)
 		}
 		
-		If ( $Disk.SerialNumber )
-		{
-			$Serial = $Disk.SerialNumber.Trim()
-		}
-		
 		$DiskInformation =
 		[PSCustomObject]@{
 			"Model"			  = $Disk.Model;
 			"Manufacturer"	  = $Disk.Manufacturer;
-			"SerialNumber"	  = $Serial;
+			"SerialNumber"	  = $Disk.SerialNumber;
 			"MediaType"		  = $PhysicalDisk.MediaType;
 			"BusType"		  = $PhysicalDisk.BusType;
 			"BootDrive"		  = $Disk.IsBoot;

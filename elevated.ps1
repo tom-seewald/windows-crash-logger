@@ -1,4 +1,4 @@
-##############################
+﻿##############################
 # Script Written By Spectrum #
 ##############################
 
@@ -41,7 +41,7 @@ $CrashLiveReports  = Join-Path -Path $CrashDumps -ChildPath "live-kernel-reports
 $Disks             = Join-Path -Path $Path -ChildPath "disks.txt"
 $OSDetails         = Join-Path -Path $Path -ChildPath "os-details.txt"
 $Partitions        = Join-Path -Path $Path -ChildPath "partitions.txt"
-$PnPDevices        = Join-Path -Path $Path -ChildPath "pnp-devices.txt"
+$PnpDevices        = Join-Path -Path $Path -ChildPath "pnp-devices.txt"
 $Processes         = Join-Path -Path $Path -ChildPath "processes.txt"
 $RestorePoints	   = Join-Path -Path $Path -ChildPath "restore-points.txt"
 $Services          = Join-Path -Path $Path -ChildPath "services.txt"
@@ -60,7 +60,7 @@ $AutoRunsPath = Join-Path -Path $PSScriptRoot -ChildPath "autorunsc.exe"
 $PowerCfgPath = Join-Path -Path $System32 -ChildPath "powercfg.exe"
 $VerifierPath = Join-Path -Path $System32 -ChildPath "verifier.exe"
 
-# https://support.microsoft.com/en-us/help/310123/error-codes-in-device-manager-in-windows
+# Translation of Device Manager error codes - for reference see: https://support.microsoft.com/en-us/help/310123/error-codes-in-device-manager-in-windows
 $DeviceManagerErrorTable =
 @{
     1  = "There is no driver installed or the driver is configured incorrectly."
