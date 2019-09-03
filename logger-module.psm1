@@ -237,7 +237,16 @@ Function Get-CrashDumpSettings
 
 	Write-Output "Getting crash dump settings..."
 	Write-Output "########################## Crash Dump Settings #########################" | Out-File -FilePath $DestinationPath
-	Get-ItemProperty -Path $CrashSettings | Out-File -Append -FilePath $DestinationPath
+	
+	If ( Test-Path -Path $CrashSettings )
+	{
+		Get-ItemProperty -Path $CrashSettings | Out-File -Append -FilePath $DestinationPath
+	}
+	
+	Else
+	{
+		Write-Output "$CrashSettings does not exist." | Out-File -Append -FilePath $DestinationPath
+	}
 
 	$CrashDumpMatrix =
 "
@@ -367,12 +376,17 @@ Function Get-FullCrashDumpInfo
 		$DestinationPath
 	)
 	
-	$CrashSettings    = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
-	$DumpPath         = (Get-ItemProperty -Path $CrashSettings).DumpFile
+	$CrashSettings = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
+	
+	If ( Test-Path -Path $CrashSettings )
+	{
+		$DumpPath = (Get-ItemProperty -Path $CrashSettings).DumpFile
+	}
+	
 	$DefaultPath      = Join-Path -Path $env:SystemRoot -ChildPath "Memory.dmp"
 	$MemoryDumpReport = Join-Path -Path $DestinationPath -ChildPath "memory-dumps.txt"
 	
-	If ( Test-Path -Path $DumpPath )
+	If ( $DumpPath -and (Test-Path -Path $DumpPath) )
 	{
 		$DumpPathProperties = Get-Item -Path $DumpPath
 		
