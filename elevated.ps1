@@ -56,7 +56,6 @@ $SleepStudy        = Join-Path -Path $PowerReports -ChildPath "power-report.html
 $DriverVerifier    = Join-Path -Path $CrashDumps -ChildPath "driver-verifier.txt"
 
 # Native file and folder locations
-$KernelReportsPath = Join-Path -Path $env:SystemRoot -ChildPath "LiveKernelReports"
 $LocalUserWER      = Join-Path -Path $home -ChildPath "AppData\Local\Microsoft\Windows\WER\ReportArchive" 
 $ProgramDataWER    = Join-Path -Path $env:ALLUSERSPROFILE -ChildPath "Microsoft\Windows\WER\ReportArchive"
 $System32          = Join-Path -Path $env:SystemRoot -ChildPath "System32"
@@ -107,11 +106,7 @@ Write-Output "Getting driver verifier settings..."
 &$VerifierPath /querysettings | Out-File -Append -FilePath $DriverVerifier
 
 # List contents of LiveKernelReports directory if it exists and is not empty
-If ( $(Test-Path -Path $KernelReportsPath) -eq $True -and $(Get-ChildItem -Path $KernelReportsPath ) -ne $null )
-{
-	$LengthMB = @{Name="Size (MB)";Expression={[math]::Round($_.Length / 1MB, 2)}}
-	Get-ChildItem -Filter "*.dmp" -Path $KernelReportsPath -Recurse | Select-Object Name,LastWriteTime,$LengthMB | Out-File -FilePath $CrashLiveReports
-}
+Get-LiveKernelReports -DestinationPath $CrashLiveReports
 
 # Gather a power report
 Write-Output "Running system power report..."

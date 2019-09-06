@@ -485,6 +485,41 @@ Function Get-InstalledSoftwareKeys
 	$ComponentKeyProps | Out-File -Append -FilePath $DestinationPath
 }
 
+# List contents of LiveKernelReports directory if it exists and is not empty
+Function Get-LiveKernelReports
+{
+	Param
+	(
+		[Parameter(Mandatory=$True)]
+		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
+		[string]
+		$DestinationPath
+	)
+	
+	$LiveReportPath = Join-Path -Path $env:SystemRoot -ChildPath "LiveKernelReports"
+	
+	If ( Test-Path -Path $LiveReportPath )
+	{
+		$LengthMB  = @{Name="Size (MB)";Expression={[math]::Round($_.Length / 1MB, 2)}}
+		$LiveDumps = Get-ChildItem -Filter "*.dmp" -Path $LiveReportPath -Recurse
+		
+		If ( $LiveDumps )
+		{
+			$LiveDumps | Select-Object Name,LastWriteTime,$LengthMB | Out-File -FilePath $DestinationPath
+		}
+		
+		Else
+		{
+			Write-Output "No LiveDumps found in $LiveReportPath." | Out-File -FilePath $DestinationPath
+		}
+	}
+
+	Else
+	{
+		Write-Output "$LiveReportPath does not exist" | Out-File -FilePath $DestinationPath
+	}
+}
+
 # Get RAM information, decode SMBIOS values into human-readable output
 Function Get-MemoryInfo
 {
