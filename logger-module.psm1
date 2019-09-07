@@ -157,6 +157,43 @@ Function Copy-MiniCrashDumps
 	}
 }
 
+Function Export-Events
+{
+	Param
+	(
+		[Parameter(Mandatory=$True)]
+		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
+		[string]
+		$DestinationPath
+	)
+	
+	$EventExportStart = $StopWatchMain.Elapsed.TotalSeconds
+	
+	$System32     = Join-Path -Path $env:SystemRoot -ChildPath "System32"
+	$WevtUtilPath = Join-Path -Path $System32 -ChildPath "wevtutil.exe"
+	$AppEvents    = Join-Path -Path $DestinationPath -ChildPath "application-events.txt"
+	$SystemEvents = Join-Path -Path $DestinationPath -ChildPath "system-events.txt"
+	$PnPEvents    = Join-Path -Path $DestinationPath -ChildPath "pnp-events.txt"
+
+	# 2592000000 ms = 30 days
+	$TimeLimit  = "2592000000"
+	$TimeString = "*[System[TimeCreated[timediff(@SystemTime) <= " + $TimeLimit + "]]]"
+
+	# Export Event Logs 
+	Write-Output "Exporting Application event Log..."
+	&$WevtUtilPath query-events Application /q:"$TimeString" /f:text | Out-File -FilePath $AppEvents 2> $null
+
+	Write-Output "Exporting System event log..."
+	&$WevtUtilPath query-events System /q:"$TimeString" /f:text | Out-File -FilePath $SystemEvents 2> $null
+
+	Write-Output "Exporting Kernel PnP event log..."
+	&$WevtUtilPath query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"$TimeString" /f:text | Out-File -FilePath $PnPEvents 2> $null
+
+	$EventExportEnd = $StopWatchMain.Elapsed.TotalSeconds
+	$EventExportSec = $EventExportEnd - $EventExportStart
+	Write-Information -MessageData "Event Log export took $EventExportSec seconds."
+}
+
 Function Get-BootInfo
 {
 	$PowerRegPath =  "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power\"
@@ -315,6 +352,7 @@ Function Get-DiskInformation
 		
 		$DiskInformation =
 		[PSCustomObject]@{
+			"Name"            = $Disk.FriendlyName;
 			"Model"			  = $Disk.Model;
 			"Manufacturer"	  = $Disk.Manufacturer;
 			"SerialNumber"	  = $Serial;

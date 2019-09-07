@@ -98,7 +98,6 @@ $EventLogs    = Join-Path -Path $Path -ChildPath "Event Logs"
 $PowerReports = Join-Path -Path $Path -ChildPath "Power Reports"
 
 # Output files
-$AppEvents         = Join-Path -Path $EventLogs -ChildPath "application-events.txt"
 $CPU               = Join-Path -Path $Path -ChildPath "cpu.txt"
 $DriverTable       = Join-Path -Path $Path -ChildPath "driver-table.txt"
 $DriverVersions    = Join-Path -Path $Path -ChildPath "driver-versions.txt"
@@ -111,11 +110,9 @@ $LicenseFile       = Join-Path -Path $Path -ChildPath "genuine.txt"
 $LicenseFileTemp   = Join-Path -Path $env:TEMP -ChildPath "genuine.xml"
 $Motherboard       = Join-Path -Path $Path -ChildPath "motherboard.txt"
 $NetworkInfo       = Join-Path -Path $Path -ChildPath "network-info.txt"
-$PnPEvents         = Join-Path -Path $EventLogs -ChildPath "pnp-events.txt"
 $PowerPlan         = Join-Path -Path $PowerReports -ChildPath "power-plan.txt"
 $SleepStates       = Join-Path -Path $PowerReports -ChildPath "sleep-states.txt"
 $RAM               = Join-Path -Path $Path -ChildPath "ram.txt"
-$SystemEvents      = Join-Path -Path $EventLogs -ChildPath "system-events.txt"
 $SystemInfo        = Join-Path -Path $Path -ChildPath "msinfo32.nfo"
 $WindowsUpdates    = Join-Path -Path $Path -ChildPath "windows-updates.txt"
 $Zip               = $Path + ".zip"
@@ -137,7 +134,6 @@ $MsInfo32Path    = Join-Path -Path $System32 -ChildPath "msinfo32.exe"
 $PowerCfgPath    = Join-Path -Path $System32 -ChildPath "powercfg.exe"
 $PowerShellPath  = (Get-Process -PID $PID).Path
 $RoutePath       = Join-Path -Path $System32 -ChildPath "route.exe"
-$WevtUtilPath    = Join-Path -Path $System32 -ChildPath "wevtutil.exe"
 
 # Timeouts for asynchronous processes to complete, in seconds
 $DriverQueryTimeout    = 60
@@ -261,20 +257,8 @@ Catch
     Write-Output $error[0]
 }
 
-# Export Event Logs (2592000000 ms = 30 days)
-Write-Output "Exporting Application event Log..."
-$EventExportStart = $StopWatchMain.Elapsed.TotalSeconds
-&$WevtUtilPath query-events Application /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text | Out-File -FilePath $AppEvents 2> $null
-
-Write-Output "Exporting System event log..."
-&$WevtUtilPath query-events System /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text | Out-File -FilePath $SystemEvents 2> $null
-
-Write-Output "Exporting Kernel PnP event log..."
-&$WevtUtilPath query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"*[System[TimeCreated[timediff(@SystemTime) <= 2592000000]]]" /f:text | Out-File -FilePath $PnPEvents 2> $null
-
-$EventExportEnd = $StopWatchMain.Elapsed.TotalSeconds
-$EventExportSec = $EventExportEnd - $EventExportStart
-Write-Information -MessageData "Event Log export took $EventExportSec seconds."
+# Export System, Application, and PnP Event Logs
+Export-Events -DestinationPath $EventLogs
 
 # Driver information
 Write-Output "Gathering device driver information..."
@@ -300,7 +284,7 @@ Get-CimInstance -ClassName Win32_Processor | Select-Object $ProcessorAttributes 
 
 # System Board information
 Write-Output "Motherboard Details" | Out-File -Append -FilePath $Motherboard
-$BaseBoardAttributes = "Product", "Model", "Version", "Manufacturer", "Description"
+$BaseBoardAttributes = "Product", "Model", "Version", "Manufacturer", "Description, Name, SKU"
 Get-CimInstance -ClassName Win32_BaseBoard | Select-Object $BaseBoardAttributes | Format-List | Out-File -Append -FilePath $Motherboard
 
 # UEFI/BIOS properties
