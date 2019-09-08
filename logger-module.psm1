@@ -174,21 +174,29 @@ Function Export-Events
 	$AppEvents    = Join-Path -Path $DestinationPath -ChildPath "application-events.txt"
 	$SystemEvents = Join-Path -Path $DestinationPath -ChildPath "system-events.txt"
 	$PnPEvents    = Join-Path -Path $DestinationPath -ChildPath "pnp-events.txt"
+	
+	If ( Test-Path -Path $WevtUtilPath )
+	{
+		# 2592000000 ms = 30 days
+		$TimeLimit  = "2592000000"
+		$TimeString = "*[System[TimeCreated[timediff(@SystemTime) <= " + $TimeLimit + "]]]"
 
-	# 2592000000 ms = 30 days
-	$TimeLimit  = "2592000000"
-	$TimeString = "*[System[TimeCreated[timediff(@SystemTime) <= " + $TimeLimit + "]]]"
+		# Export Event Logs 
+		Write-Output "Exporting Application event Log..."
+		&$WevtUtilPath query-events Application /q:"$TimeString" /f:text | Out-File -FilePath $AppEvents 2> $null
 
-	# Export Event Logs 
-	Write-Output "Exporting Application event Log..."
-	&$WevtUtilPath query-events Application /q:"$TimeString" /f:text | Out-File -FilePath $AppEvents 2> $null
+		Write-Output "Exporting System event log..."
+		&$WevtUtilPath query-events System /q:"$TimeString" /f:text | Out-File -FilePath $SystemEvents 2> $null
 
-	Write-Output "Exporting System event log..."
-	&$WevtUtilPath query-events System /q:"$TimeString" /f:text | Out-File -FilePath $SystemEvents 2> $null
-
-	Write-Output "Exporting Kernel PnP event log..."
-	&$WevtUtilPath query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"$TimeString" /f:text | Out-File -FilePath $PnPEvents 2> $null
-
+		Write-Output "Exporting Kernel PnP event log..."
+		&$WevtUtilPath query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"$TimeString" /f:text | Out-File -FilePath $PnPEvents 2> $null
+	}
+	
+	Else
+	{
+		Write-Warning "$WevtUtilPath does not exist, cannot export event logs"
+	}
+	
 	$EventExportEnd = $StopWatchMain.Elapsed.TotalSeconds
 	$EventExportSec = $EventExportEnd - $EventExportStart
 	Write-Information -MessageData "Event Log export took $EventExportSec seconds."
@@ -373,14 +381,14 @@ Function Get-DiskInformation
 			"PartitionStyle"         = $Disk.PartitionStyle;
 			"FirmwareVersion"        = $Disk.FirmwareVersion;
 			"Size(GB)"		         = $SizeGB;
-			"Temperature"            = $ReliabilityCounter.Temperature
-			"TemperatureMax"         = $ReliabilityCounter.TemperatureMax
-			"Wear"                   = $ReliabilityCounter.Wear
-			"PowerOnHours"           = $ReliabilityCounter.PowerOnHours
-			"ReadErrorsUncorrected"  = $ReliabilityCounter.ReadErrorsUncorrected
-			"ReadErrorsCorrected"    = $ReliabilityCounter.ReadErrorsCorrected
-			"WriteErrorsUncorrected" = $ReliabilityCounter.WriteErrorsUncorrected
-			"WriteErrorsCorrected"   = $ReliabilityCounter.WriteErrorsCorrected
+			"Temperature"            = $ReliabilityCounter.Temperature;
+			"TemperatureMax"         = $ReliabilityCounter.TemperatureMax;
+			"Wear"                   = $ReliabilityCounter.Wear;
+			"PowerOnHours"           = $ReliabilityCounter.PowerOnHours;
+			"ReadErrorsUncorrected"  = $ReliabilityCounter.ReadErrorsUncorrected;
+			"ReadErrorsCorrected"    = $ReliabilityCounter.ReadErrorsCorrected;
+			"WriteErrorsUncorrected" = $ReliabilityCounter.WriteErrorsUncorrected;
+			"WriteErrorsCorrected"   = $ReliabilityCounter.WriteErrorsCorrected;
 		}
 
 		$DiskInfoArray.Add($DiskInformation) | Out-Null
