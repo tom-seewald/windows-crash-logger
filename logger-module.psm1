@@ -374,6 +374,7 @@ Function Get-DiskInformation
 			"Name"                   = $Disk.FriendlyName;
 			"Model"			         = $Disk.Model;
 			"Manufacturer"	         = $Disk.Manufacturer;
+			"PartNumber"             = $PhysicalDisk.PartNumber;
 			"SerialNumber"	         = $Serial;
 			"MediaType"		         = $PhysicalDisk.MediaType;
 			"BusType"		         = $PhysicalDisk.BusType;
@@ -381,6 +382,7 @@ Function Get-DiskInformation
 			"PartitionStyle"         = $Disk.PartitionStyle;
 			"FirmwareVersion"        = $Disk.FirmwareVersion;
 			"Size(GB)"		         = $SizeGB;
+			"GUID"                   = $Disk.Guid;
 			"Temperature"            = $ReliabilityCounter.Temperature;
 			"TemperatureMax"         = $ReliabilityCounter.TemperatureMax;
 			"Wear"                   = $ReliabilityCounter.Wear;

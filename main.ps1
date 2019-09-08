@@ -6,7 +6,7 @@
 $ErrorActionPreference = 'Stop'
 
 # Version String
-$ScriptVersion = "V2 Log Collector 1.05 - 9/07/19"
+$ScriptVersion = "V2 Log Collector 1.05 - 9/08/19"
 
 # Default to UTF-8 output
 $PSDefaultParameterValues['*:Encoding'] = 'UTF8'
@@ -111,6 +111,7 @@ $FileHashes        = Join-Path -Path $env:LOCALAPPDATA -ChildPath "hashes.txt"
 $GPU               = Join-Path -Path $Path -ChildPath "gpu.txt"
 $HostsReport       = Join-Path -Path $Path -ChildPath "hosts.txt"
 $InstalledSoftware = Join-Path -Path $Path -ChildPath "installed-software.txt"
+$LicenseDiagLog    = Join-Path -Path $env:TEMP -ChildPath "licensingdiag-log.txt"
 $LicenseFile       = Join-Path -Path $Path -ChildPath "genuine.txt"
 $LicenseFileTemp   = Join-Path -Path $env:TEMP -ChildPath "genuine.xml"
 $Motherboard       = Join-Path -Path $Path -ChildPath "motherboard.txt"
@@ -249,7 +250,8 @@ Catch
 # Start License Diagnostics
 Try
 {
-	$LicenseDiag = Start-Process -FilePath $LicenseDiagPath -ArgumentList "/report","$LicenseFileTemp" -WindowStyle Hidden -PassThru
+	# licensingdiag.exe outputs error messages to standardoutput, which is why we are not using -RedirectStandardError
+	$LicenseDiag = Start-Process -FilePath $LicenseDiagPath -ArgumentList "/report","$LicenseFileTemp" -RedirectStandardOutput $LicenseDiagLog -WindowStyle Hidden -PassThru
 }
 
 Catch
@@ -352,6 +354,17 @@ Else
 	Write-Warning "$LicenseFileTemp does not exist."
 }
 
+# Send all output of licensingdiag.exe to $LicenseFile
+If ( Test-Path -Path $LicenseDiagLog )
+{
+	Get-Content -Encoding Unicode -Path $LicenseDiagLog | Out-File -Append -FilePath $LicenseFile
+}
+
+Else
+{
+	Write-Information -Message "$LicenseDiagLog does not exist."
+}
+
 # Wait for dxdiag.exe to finish
 If ( $DxDiag -ne $null )
 {
@@ -359,7 +372,7 @@ If ( $DxDiag -ne $null )
 }
 
 # Wait for driverquery.exe to finish
-If ( $DxDiag -ne $null )
+If ( $DriverQuery -ne $null )
 {
 	Wait-Process -ProcessObject $DriverQuery -ProcessName "driverquery.exe" -TimeoutSeconds $DriverQueryTimeout
 }
