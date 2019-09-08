@@ -19,6 +19,13 @@ $StopWatchElevated = [System.Diagnostics.StopWatch]::StartNew()
 # Default to UTF-8 output
 $PSDefaultParameterValues['*:Encoding'] = 'UTF8'
 
+# Log file
+$TranscriptFile = "transcript-elevated.txt"
+$TranscriptPath = Join-Path -Path $env:TEMP -ChildPath $TranscriptFile
+
+# Begin logging
+Start-Transcript -Path $TranscriptPath -Force | Out-Null
+
 # Detect Windows version
 $WindowsBuild  = [System.Environment]::OSVersion.Version.Build
 $Win10MinBuild = 10240
@@ -26,14 +33,8 @@ $Win10MinBuild = 10240
 # Crash dumps to collect per minidump folder
 $CrashesToCollect = 5
 
-# This is set because $PSScriptRoot is not available on stock Windows 7 SP1
-$PSScriptRoot = Split-Path $MyInvocation.MyCommand.Path -Parent
-
 # Module path
 $LoggerModule = Join-Path -Path $PSScriptRoot -ChildPath "logger-module.psm1"
-
-# Log file
-$Transcript = Join-Path -Path $env:TEMP -ChildPath "transcript-elevated.txt"
 
 # Output folders
 $CrashDumps   = Join-Path -Path $Path -ChildPath "Crash Dumps"
@@ -65,16 +66,12 @@ $AutoRunsPath = Join-Path -Path $PSScriptRoot -ChildPath "autorunsc.exe"
 $PowerCfgPath = Join-Path -Path $System32 -ChildPath "powercfg.exe"
 $VerifierPath = Join-Path -Path $System32 -ChildPath "verifier.exe"
 
-# Begin logging
-Start-Transcript -Path $Transcript -Force | Out-Null
-
 # Import custom module containing support functions
-$ErrorActionPreference = 'Stop'
 Import-Module $LoggerModule
 
 # Create folders, power reports has already been created by main.ps1
-New-Item -ItemType Directory $CrashDumps -Force -ErrorAction Stop | Out-Null
-New-Item -ItemType Directory $WER -Force -ErrorAction Stop | Out-Null
+New-Item -ItemType Directory $CrashDumps -Force | Out-Null
+New-Item -ItemType Directory $WER -Force | Out-Null
 
 # End of "critical" area, errors will now default to being non-fatal
 $ErrorActionPreference = 'Continue'
@@ -200,19 +197,24 @@ Else
 }
 
 # Stop transcript and move it into $Path
-If ( Test-Path -Path $Transcript )
+If ( Test-Path -Path $TranscriptPath )
 {
 	Stop-Transcript | Out-Null
 
 	# Allow transcript to be moved and read by standard users, otherwise hashing and compression may fail 
-	$TranscriptACL = Get-ACL -Path $Transcript
+	$TranscriptACL = Get-ACL -Path $TranscriptPath
 	$TranscriptACL.SetAccessRuleProtection(1,0)
 	$NewAccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule("everyone","full","none","none","Allow")
 	$TranscriptACL.AddAccessRule($NewAccessRule)
-	Set-Acl -Path $Transcript -AclObject $TranscriptACL
+	Set-Acl -Path $TranscriptPath -AclObject $TranscriptACL
 
 	# Move transcript into $Path
-	Move-Item -Path $Transcript -Destination $Path -Force
+	Move-Item -Path $TranscriptPath -Destination $Path -Force
+}
+
+Else
+{
+	Write-Output "$TranscriptPath not found." | Out-File -Append -FilePath "$Path\transcript-elevated.txt"
 }
 
 # Stop script, it was launched with -NoExit so we must actually stop the process to close the Window

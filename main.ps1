@@ -6,7 +6,7 @@
 $ErrorActionPreference = 'Stop'
 
 # Version String
-$ScriptVersion = "V2 Log Collector 1.04 - 9/06/19"
+$ScriptVersion = "V2 Log Collector 1.05 - 9/07/19"
 
 # Default to UTF-8 output
 $PSDefaultParameterValues['*:Encoding'] = 'UTF8'
@@ -80,6 +80,14 @@ Clear-Host
 # Track execution time of the script
 $StopWatchMain = [System.Diagnostics.StopWatch]::StartNew()
 
+# Log file
+$TranscriptFile = "transcript-main.txt"
+$TranscriptPath = Join-Path $env:TEMP -ChildPath $TranscriptFile
+
+# Begin logging
+Start-Transcript -Path $TranscriptPath -Force | Out-Null
+Write-Information -MessageData $ScriptVersion
+
 # Create folder name
 $Time       = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 $FolderName = "$env:COMPUTERNAME-($Time)"
@@ -87,9 +95,6 @@ $FolderName = "$env:COMPUTERNAME-($Time)"
 # Define paths to other script files
 $ElevatedScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "elevated.ps1"
 $LoggerModule       = Join-Path -Path $PSScriptRoot -ChildPath "logger-module.psm1"
-
-# Log file
-$Transcript = Join-Path $env:TEMP -ChildPath "transcript-main.txt"
 
 # Output folders
 $Desktop      = [Environment]::GetFolderPath("Desktop")
@@ -141,10 +146,6 @@ $DxDiagTimeout         = 60
 $ElevatedScriptTimeout = 150
 $LicenseTimeout        = 120
 $MsInfo32Timeout       = 420
-
-# Begin logging
-Start-Transcript -Path $Transcript -Force | Out-Null
-Write-Information -MessageData $ScriptVersion
 
 # Import custom module containing support functions
 Import-Module $LoggerModule
@@ -398,9 +399,14 @@ Else
 Stop-Transcript | Out-Null
 
 # Move transcript to $Path
-If ( Test-Path -Path $Transcript )
+If ( Test-Path -Path $TranscriptPath )
 {
-    Move-Item -Path $Transcript -Destination $Path -Force
+    Move-Item -Path $TranscriptPath -Destination $Path -Force
+}
+
+Else
+{
+	Write-Output "$TranscriptPath not found." | Out-File -Append -FilePath "$Path\transcript-main.txt"
 }
 
 # Get hash of files to later check for corruption, we skip .wer files as there can be hundreds of them which can take an excessive amount of time to hash

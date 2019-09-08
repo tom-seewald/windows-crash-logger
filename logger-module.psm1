@@ -350,18 +350,37 @@ Function Get-DiskInformation
 			$Serial = $Disk.SerialNumber.Trim()
 		}
 		
+		# Obtain disk reliability statistics
+		If ( $PhysicalDisk )
+		{
+			$ReliabilityCounter = $PhysicalDisk | Get-StorageReliabilityCounter
+		}
+		
+		Else
+		{
+			Write-Information -MessageData "Did not obtain disk reliability counters for disk $($Disk.FriendlyName) as PhysicalDisk was null."
+		}
+		
 		$DiskInformation =
 		[PSCustomObject]@{
-			"Name"            = $Disk.FriendlyName;
-			"Model"			  = $Disk.Model;
-			"Manufacturer"	  = $Disk.Manufacturer;
-			"SerialNumber"	  = $Serial;
-			"MediaType"		  = $PhysicalDisk.MediaType;
-			"BusType"		  = $PhysicalDisk.BusType;
-			"BootDrive"		  = $Disk.IsBoot;
-			"PartitionStyle"  = $Disk.PartitionStyle;
-			"FirmwareVersion" = $Disk.FirmwareVersion;
-			"Size(GB)"		  = $SizeGB;
+			"Name"                   = $Disk.FriendlyName;
+			"Model"			         = $Disk.Model;
+			"Manufacturer"	         = $Disk.Manufacturer;
+			"SerialNumber"	         = $Serial;
+			"MediaType"		         = $PhysicalDisk.MediaType;
+			"BusType"		         = $PhysicalDisk.BusType;
+			"BootDrive"		         = $Disk.IsBoot;
+			"PartitionStyle"         = $Disk.PartitionStyle;
+			"FirmwareVersion"        = $Disk.FirmwareVersion;
+			"Size(GB)"		         = $SizeGB;
+			"Temperature"            = $ReliabilityCounter.Temperature
+			"TemperatureMax"         = $ReliabilityCounter.TemperatureMax
+			"Wear"                   = $ReliabilityCounter.Wear
+			"PowerOnHours"           = $ReliabilityCounter.PowerOnHours
+			"ReadErrorsUncorrected"  = $ReliabilityCounter.ReadErrorsUncorrected
+			"ReadErrorsCorrected"    = $ReliabilityCounter.ReadErrorsCorrected
+			"WriteErrorsUncorrected" = $ReliabilityCounter.WriteErrorsUncorrected
+			"WriteErrorsCorrected"   = $ReliabilityCounter.WriteErrorsCorrected
 		}
 
 		$DiskInfoArray.Add($DiskInformation) | Out-Null
