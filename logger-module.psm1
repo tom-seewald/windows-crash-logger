@@ -194,7 +194,7 @@ Function Export-Events
 	
 	Else
 	{
-		Write-Warning "$WevtUtilPath does not exist, cannot export event logs"
+		Write-Warning "$WevtUtilPath does not exist, cannot export event logs."
 	}
 	
 	$EventExportEnd = $StopWatchMain.Elapsed.TotalSeconds
@@ -458,7 +458,7 @@ Function Get-FullCrashDumpInfo
 		$DumpPathProperties = Get-Item -Path $DumpPath
 		
 		Write-Output "Crash dump found at $DumpPath" | Out-File -Append -FilePath $MemoryDumpReport
-		Write-Output "Creation date: $((Get-Item -Path $DumpPath).LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
+		Write-Output "Creation date: $($DumpPathProperties.LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
 		Write-Output "Size on disk: $([math]::round($DumpPathProperties.Length / 1MB)) MB" | Out-File -Append -FilePath $MemoryDumpReport
 	}
 
@@ -474,7 +474,7 @@ Function Get-FullCrashDumpInfo
 			$DefaultPathProperties = Get-Item -Path $DefaultPath
 			
 			Write-Output "Crash dump found at $DefaultPath" | Out-File -Append -FilePath $MemoryDumpReport
-			Write-Output "Creation date: $((Get-Item -Path $DefaultPath).LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
+			Write-Output "Creation date: $($DumpPathProperties.LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
 			Write-Output "Size on disk: $([math]::round($DefaultPathProperties.Length / 1MB)) MB" | Out-File -Append -FilePath $MemoryDumpReport
 		}
 
