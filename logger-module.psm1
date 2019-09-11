@@ -474,7 +474,7 @@ Function Get-FullCrashDumpInfo
 			$DefaultPathProperties = Get-Item -Path $DefaultPath
 			
 			Write-Output "Crash dump found at $DefaultPath" | Out-File -Append -FilePath $MemoryDumpReport
-			Write-Output "Creation date: $($DumpPathProperties.LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
+			Write-Output "Creation date: $($DefaultPathProperties.LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
 			Write-Output "Size on disk: $([math]::round($DefaultPathProperties.Length / 1MB)) MB" | Out-File -Append -FilePath $MemoryDumpReport
 		}
 
