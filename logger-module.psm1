@@ -57,7 +57,7 @@ Function Convert-UTF8
 
 		$Content = Get-Content -Path $FilePath
 
-		If ( $Content -ne $null )
+		If ( $Content )
 		{
 			[System.IO.File]::WriteAllLines($FilePath, $Content, $Utf8NoBomEncoding)
 		}
@@ -72,7 +72,7 @@ Function Convert-UTF8
 # Checks both the standard path and the registry to see if there was an alternate path specified
 # $CrashesToCollect is a per-folder value
 # In the event both $MinidumpPath and $DefaultPath are not the same folder, and both have $CrashesToCollect or more dump files, it will collect 2 * $CrashesToCollect dumps.
-Function Copy-MiniCrashDumps
+Function Copy-MiniCrashDump
 {
 	Param
 	(
@@ -81,14 +81,14 @@ Function Copy-MiniCrashDumps
 		[string]
 		$DestinationPath,
 		[Parameter(Mandatory=$False)]
-		[ValidateRange(1,100)] 
+		[ValidateRange(1,100)]
 		[int]
 		$CrashesToCollect = 5
 	)
 
 	$SizeMB = @{Name="Size (MB)";Expression={[math]::Round($_.Length / 1MB, 4)}}
 	$CrashSettings  = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
-	
+
 	If ( Test-Path -Path $CrashSettings )
 	{
 		$MinidumpPath = (Get-ItemProperty -Path $CrashSettings).MinidumpDir
@@ -105,7 +105,7 @@ Function Copy-MiniCrashDumps
 
 		$MiniDumpPathContents = Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath
 
-		If ( $MiniDumpPathContents -ne $null )
+		If ( $MiniDumpPathContents )
 		{
 			Write-Output "Copying crash dumps from $MinidumpPath..."
 			$CrashDumps = Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First $CrashesToCollect
@@ -135,7 +135,7 @@ Function Copy-MiniCrashDumps
 
 			$DefaultPathContents = Get-ChildItem -Filter "*.dmp" -Path $DefaultPath
 
-			If ( $DefaultPathContents -ne $null )
+			If ( $DefaultPathContents )
 			{
 				Write-Output "Copying crash dumps from $DefaultPath..."
 				$CrashDumps = Get-ChildItem -Filter "*.dmp" -Path $DefaultPath  | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First $CrashesToCollect
@@ -157,7 +157,7 @@ Function Copy-MiniCrashDumps
 	}
 }
 
-Function Export-Events
+Function Export-EventLog
 {
 	Param
 	(
@@ -166,22 +166,22 @@ Function Export-Events
 		[string]
 		$DestinationPath
 	)
-	
+
 	$EventExportStart = $StopWatchMain.Elapsed.TotalSeconds
-	
+
 	$System32     = Join-Path -Path $env:SystemRoot -ChildPath "System32"
 	$WevtUtilPath = Join-Path -Path $System32 -ChildPath "wevtutil.exe"
 	$AppEvents    = Join-Path -Path $DestinationPath -ChildPath "application-events.txt"
 	$SystemEvents = Join-Path -Path $DestinationPath -ChildPath "system-events.txt"
 	$PnPEvents    = Join-Path -Path $DestinationPath -ChildPath "pnp-events.txt"
-	
+
 	If ( Test-Path -Path $WevtUtilPath )
 	{
 		# 2592000000 ms = 30 days
 		$TimeLimit  = "2592000000"
 		$TimeString = "*[System[TimeCreated[timediff(@SystemTime) <= " + $TimeLimit + "]]]"
 
-		# Export Event Logs 
+		# Export Event Logs
 		Write-Output "Exporting Application event Log..."
 		&$WevtUtilPath query-events Application /q:"$TimeString" /f:text | Out-File -FilePath $AppEvents 2> $null
 
@@ -191,12 +191,12 @@ Function Export-Events
 		Write-Output "Exporting Kernel PnP event log..."
 		&$WevtUtilPath query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"$TimeString" /f:text | Out-File -FilePath $PnPEvents 2> $null
 	}
-	
+
 	Else
 	{
 		Write-Warning "$WevtUtilPath does not exist, cannot export event logs."
 	}
-	
+
 	$EventExportEnd = $StopWatchMain.Elapsed.TotalSeconds
 	$EventExportSec = $EventExportEnd - $EventExportStart
 	Write-Information -MessageData "Event Log export took $EventExportSec seconds."
@@ -235,7 +235,7 @@ Function Get-BootInfo
 
 	# Confirm if UEFI is enabled and if SecureBoot is enabled
 	$FirmwareType = Get-FirmwareType
-	
+
 	# If the system is not using UEFI secureboot is not enabled as it is a UEFI-specific feature
 	If ( $FirmwareType -ne "UEFI" )
 	{
@@ -269,7 +269,7 @@ Function Get-BootInfo
 	Return $FirmwareInfo
 }
 
-Function Get-CrashDumpSettings
+Function Get-CrashDumpSetting
 {
 	Param
 	(
@@ -277,17 +277,17 @@ Function Get-CrashDumpSettings
 		[string]
 		$DestinationPath
 	)
-	
+
 	$CrashSettings = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
 
 	Write-Output "Getting crash dump settings..."
 	Write-Output "########################## Crash Dump Settings #########################" | Out-File -FilePath $DestinationPath
-	
+
 	If ( Test-Path -Path $CrashSettings )
 	{
 		Get-ItemProperty -Path $CrashSettings | Out-File -Append -FilePath $DestinationPath
 	}
-	
+
 	Else
 	{
 		Write-Output "$CrashSettings does not exist." | Out-File -Append -FilePath $DestinationPath
@@ -319,24 +319,24 @@ Function Get-DiskInformation
 	{
 
 		# Attempt to match based on Windows uniqueID assigned to each disk
-		If ( $Disk.UniqueId -ne $null )
+		If ( $Disk.UniqueId )
 		{
 			$PhysicalDisk = $PhysicalDisks | Where-Object { $_.UniqueId -eq $Disk.UniqueId }
 		}
-		
+
 		# If a disk has a null uniqueID, fallback to using the serialnumber as a unique identifier
-		ElseIf ( $Disk.SerialNumber -ne $null )
+		ElseIf ( $Disk.SerialNumber )
 		{
 			Write-Warning "Disk has null UniqueId - attempting to match based on SerialNumber"
 			$PhysicalDisk = $PhysicalDisks | Where-Object { $_.SerialNumber -eq $Disk.SerialNumber }
 		}
-		
+
 		# Both the uniqueID and SerialNumber fields are null, inform user
 		Else
 		{
 			Write-Warning "Disk has null UniqueId and null SerialNumber - cannot find matched physical disk."
 		}
-		
+
 		# If multiple disks have the same uniqueID or SerialNumber create an array of their sizes
 		If ( $PhysicalDisk.Count -ge 1 )
 		{
@@ -347,28 +347,28 @@ Function Get-DiskInformation
 				$SizeGB += [math]::Round($PhysicalDisk.Size / 1GB, 2)
 			}
 		}
-		
+
 		Else
 		{
 			$SizeGB = [math]::Round($PhysicalDisk.Size / 1GB, 2)
 		}
-		
+
 		If ( $Disk.SerialNumber )
 		{
 			$Serial = $Disk.SerialNumber.Trim()
 		}
-		
+
 		# Obtain disk reliability statistics
 		If ( $PhysicalDisk )
 		{
 			$ReliabilityCounter = $PhysicalDisk | Get-StorageReliabilityCounter
 		}
-		
+
 		Else
 		{
 			Write-Information -MessageData "Did not obtain disk reliability counters for disk $($Disk.FriendlyName) as PhysicalDisk was null."
 		}
-		
+
 		$DiskInformation =
 		[PSCustomObject]@{
 			"Name"                   = $Disk.FriendlyName;
@@ -442,21 +442,21 @@ Function Get-FullCrashDumpInfo
 		[string]
 		$DestinationPath
 	)
-	
+
 	$CrashSettings = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
-	
+
 	If ( Test-Path -Path $CrashSettings )
 	{
 		$DumpPath = (Get-ItemProperty -Path $CrashSettings).DumpFile
 	}
-	
+
 	$DefaultPath      = Join-Path -Path $env:SystemRoot -ChildPath "Memory.dmp"
 	$MemoryDumpReport = Join-Path -Path $DestinationPath -ChildPath "memory-dumps.txt"
-	
+
 	If ( $DumpPath -and (Test-Path -Path $DumpPath) )
 	{
 		$DumpPathProperties = Get-Item -Path $DumpPath
-		
+
 		Write-Output "Crash dump found at $DumpPath" | Out-File -Append -FilePath $MemoryDumpReport
 		Write-Output "Creation date: $($DumpPathProperties.LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
 		Write-Output "Size on disk: $([math]::round($DumpPathProperties.Length / 1MB)) MB" | Out-File -Append -FilePath $MemoryDumpReport
@@ -472,7 +472,7 @@ Function Get-FullCrashDumpInfo
 		If ( Test-Path -Path $DefaultPath )
 		{
 			$DefaultPathProperties = Get-Item -Path $DefaultPath
-			
+
 			Write-Output "Crash dump found at $DefaultPath" | Out-File -Append -FilePath $MemoryDumpReport
 			Write-Output "Creation date: $($DefaultPathProperties.LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
 			Write-Output "Size on disk: $([math]::round($DefaultPathProperties.Length / 1MB)) MB" | Out-File -Append -FilePath $MemoryDumpReport
@@ -486,7 +486,7 @@ Function Get-FullCrashDumpInfo
 }
 
 # Get information about installed software by looking at the registry
-Function Get-InstalledSoftwareKeys
+Function Get-InstalledSoftware
 {
     Param
 	(
@@ -495,7 +495,7 @@ Function Get-InstalledSoftwareKeys
 		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
 		$DestinationPath
 	)
-    
+
     # Registry locations that contain installed software information
     $NativeSoftware      = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"
     $Wow6432Software     = "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
@@ -507,10 +507,10 @@ Function Get-InstalledSoftwareKeys
 	# Native software
 	Write-Output "Native Software" | Out-File -FilePath $DestinationPath
 
-	$NativeKeyProps = Get-RegKeyProps -Path $NativeSoftware
-	
+	$NativeKeyProps = Get-RegKeyProperty -Path $NativeSoftware
+
 	$NativeKeyProps = $NativeKeyProps | Select-Object $SoftwareAttributes
-	$NativeKeyProps = $NativeKeyProps | Where-Object { $_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null }
+	$NativeKeyProps = $NativeKeyProps | Where-Object { $_.DisplayName -or $_.DisplayVersion -or $_.Publisher -or $_.InstallDate }
 	$NativeKeyProps = $NativeKeyProps | Sort-Object DisplayName | Format-Table -AutoSize
 
 	$NativeKeyProps | Out-File -Append -FilePath $DestinationPath
@@ -520,10 +520,10 @@ Function Get-InstalledSoftwareKeys
     {
 		Write-Output "32-bit Software" | Out-File -Append -FilePath $DestinationPath
 
-		$Wow6432KeyProps = Get-RegKeyProps -Path $Wow6432Software
+		$Wow6432KeyProps = Get-RegKeyProperty -Path $Wow6432Software
 
 		$Wow6432KeyProps = $Wow6432KeyProps | Select-Object $SoftwareAttributes
-		$Wow6432KeyProps = $Wow6432KeyProps | Where-Object {$_.DisplayName -ne $null -or $_.DisplayVersion -ne $null -or $_.Publisher -ne $null -or $_.InstallDate -ne $null}
+		$Wow6432KeyProps = $Wow6432KeyProps | Where-Object { $_.DisplayName -or $_.DisplayVersion -or $_.Publisher -or $_.InstallDate }
 		$Wow6432KeyProps = $Wow6432KeyProps | Sort-Object DisplayName | Format-Table -AutoSize
 
 		$Wow6432KeyProps | Out-File -Append -FilePath $DestinationPath
@@ -532,10 +532,10 @@ Function Get-InstalledSoftwareKeys
 	# Per-user software for the current user
 	Write-Output "User-specific Software" | Out-File -Append -FilePath $DestinationPath
 
-	$UserSoftKeyProps = Get-RegKeyProps -Path $UserSoftware
+	$UserSoftKeyProps = Get-RegKeyProperty -Path $UserSoftware
 
-	$UserSoftKeyProps = $UserSoftKeyProps | Select-Object $SoftwareAttributes 
-	$UserSoftKeyProps = $UserSoftKeyProps | Where-Object {$_.DisplayName -ne $null} 
+	$UserSoftKeyProps = $UserSoftKeyProps | Select-Object $SoftwareAttributes
+	$UserSoftKeyProps = $UserSoftKeyProps | Where-Object { $_.DisplayName }
 	$UserSoftKeyProps = $UserSoftKeyProps | Sort-Object DisplayName | Format-Table -AutoSize
 
 	$UserSoftKeyProps | Out-File -Append -FilePath $DestinationPath
@@ -543,17 +543,17 @@ Function Get-InstalledSoftwareKeys
 	# Windows components
 	Write-Output "Installed Windows Components" | Out-File -Append -FilePath $DestinationPath
 
-	$ComponentKeyProps = Get-RegKeyProps -Path $InstalledComponents
-	
-	$ComponentKeyProps = $ComponentKeyProps | Select-Object "(Default)", ComponentID, Version, Enabled 
-	$ComponentKeyProps = $ComponentKeyProps | Where-Object {$_."(Default)" -ne $null -or $_.ComponentID -ne $null} 
+	$ComponentKeyProps = Get-RegKeyProperty -Path $InstalledComponents
+
+	$ComponentKeyProps = $ComponentKeyProps | Select-Object "(Default)", ComponentID, Version, Enabled
+	$ComponentKeyProps = $ComponentKeyProps | Where-Object { $_."(Default)" -or $_.ComponentID }
 	$ComponentKeyProps = $ComponentKeyProps | Sort-Object "(default)" | Format-Table -AutoSize
 
 	$ComponentKeyProps | Out-File -Append -FilePath $DestinationPath
 }
 
 # List contents of LiveKernelReports directory if it exists and is not empty
-Function Get-LiveKernelReports
+Function Get-LiveKernelReport
 {
 	Param
 	(
@@ -562,19 +562,19 @@ Function Get-LiveKernelReports
 		[string]
 		$DestinationPath
 	)
-	
+
 	$LiveReportPath = Join-Path -Path $env:SystemRoot -ChildPath "LiveKernelReports"
-	
+
 	If ( Test-Path -Path $LiveReportPath )
 	{
 		$LengthMB  = @{Name="Size (MB)";Expression={[math]::Round($_.Length / 1MB, 2)}}
 		$LiveDumps = Get-ChildItem -Filter "*.dmp" -Path $LiveReportPath -Recurse
-		
+
 		If ( $LiveDumps )
 		{
 			$LiveDumps | Select-Object Name,LastWriteTime,$LengthMB | Out-File -FilePath $DestinationPath
 		}
-		
+
 		Else
 		{
 			Write-Output "No LiveDumps found in $LiveReportPath." | Out-File -FilePath $DestinationPath
@@ -618,7 +618,7 @@ Function Get-MemoryInfo
 		19 = "LCC"
 		20 = "PLCC"
 		21 = "BGA"
-		22 = "FPBGA" 
+		22 = "FPBGA"
 		23 = "LGA"
 	}
 
@@ -644,7 +644,7 @@ Function Get-MemoryInfo
 	}
 
 	# Hash table for translating numeric value of MemoryType to a human-readable result
-	$TypeHashTable = 
+	$TypeHashTable =
 	@{
 		1  = "Other"
 		2  = "Unknown"
@@ -767,7 +767,7 @@ Function Get-MemoryInfo
 
 		$DIMMArray.Add($DIMMInfo) | Out-Null
 	}
-	
+
 	Return $DIMMArray
 }
 
@@ -818,16 +818,17 @@ Function Get-PnpDeviceInfo
 
 	# List PnP devices and associated information
 	$ErrorCode = @{Name="ErrorCode";Expression={ $_.ConfigManagerErrorCode }}
-	$ErrorText = @{Name="ErrorText";Expression={ $DeviceManagerErrorTable.($_.ConfigManagerErrorCode -as [int]) }}
+	#$ErrorText = @{Name="ErrorText";Expression={ $DeviceManagerErrorTable.($_.ConfigManagerErrorCode -as [int]) }}
+	$ErrorText = @{Name="ErrorText";Expression={ $DeviceManagerErrorTable.([int] $_.ConfigManagerErrorCode) }}
 	$Attributes = "Name", "Status", $ErrorCode, $ErrorText, "Description", "Manufacturer", "DeviceID"
-	
+
 	$PnpDevices = Get-CimInstance -ClassName Win32_PNPEntity | Select-Object $Attributes | Sort-Object Name
 	Return $PnpDevices
 }
 
 # We have to implement error handling when using Get-ItemProperty when getting registry key properties , as it can fail if a key is corrupted or was otherwise improperly written.
 # For further information, see this bug report: https://github.com/PowerShell/PowerShell/issues/9552
-Function Get-RegKeyProps
+Function Get-RegKeyProperty
 {
 	Param
 	(
@@ -838,7 +839,7 @@ Function Get-RegKeyProps
 	)
 
 	$RegKeys = Get-ChildItem -Path $Path
-	
+
 	# The absolute worst-case is that every key in the path is bad, so limit our attempts to that count.
 	$TryLimit = $RegKeys.Count
 	$TryCount = 1
@@ -862,7 +863,7 @@ Function Get-RegKeyProps
 			{
 				Try
 				{
-					Get-ItemProperty -LiteralPath $Key.PSPath | Out-Null 
+					Get-ItemProperty -LiteralPath $Key.PSPath | Out-Null
 				}
 				Catch
 				{
@@ -872,7 +873,7 @@ Function Get-RegKeyProps
 			}
 
 			Write-Information -MessageData "Bad registry key found: $BadKey"
-			
+
 			# Remove $BadKey from the list of registry keys to look at in the next loop
 			$RegKeys = $RegKeys | Where-Object { $BadKey -NotContains $_.PSPath }
 
@@ -937,7 +938,7 @@ $Signature = @'
 	[DllImport("kernel32.dll", SetLastError=true)]
 	[return: MarshalAs(UnmanagedType.Bool)]
 	public static extern bool GetVolumePathNamesForVolumeNameW([MarshalAs(UnmanagedType.LPWStr)] string lpszVolumeName,
-			[MarshalAs(UnmanagedType.LPWStr)] [Out] StringBuilder lpszVolumeNamePaths, uint cchBuferLength, 
+			[MarshalAs(UnmanagedType.LPWStr)] [Out] StringBuilder lpszVolumeNamePaths, uint cchBuferLength,
 			ref UInt32 lpcchReturnLength);
 
 	[DllImport("kernel32.dll", SetLastError = true)]
@@ -953,9 +954,7 @@ $Signature = @'
 
 	Add-Type -MemberDefinition $Signature -Name Win32Utils -Namespace PInvoke -Using PInvoke,System.Text;
 
-	$lpcchReturnLength = 0;
-	$Max = 65535
-
+	$Max          = 65535
 	$VolumeName   = New-Object System.Text.StringBuilder($Max, $Max)
 	$PathName     = New-Object System.Text.StringBuilder($Max, $Max)
 	$MountPoint   = New-Object System.Text.StringBuilder($Max, $Max)
@@ -968,13 +967,12 @@ $Signature = @'
 	Do
 	{
 		$Volume = $VolumeName.ToString()
-		$Unused = [PInvoke.Win32Utils]::GetVolumePathNamesForVolumeNameW($Volume, $MountPoint, $Max, [Ref] $lpcchReturnLength);
 		$ReturnLength = [PInvoke.Win32Utils]::QueryDosDevice($Volume.Substring(4, $Volume.Length - 1 - 4), $PathName, [UInt32] $Max);
-		
+
 		If ( $ReturnLength )
 		{
 			$VolumeInstance = $VolumeWMI | Where-Object { $_.DeviceID -eq $Volume }
-			
+
 			$VolumeInformation = [PSCustomObject]@{
 				DriveLetter = $MountPoint.ToString()
 				DevicePath  = $PathName.ToString()
@@ -985,11 +983,12 @@ $Signature = @'
 
 			$VolumeArray.Add($VolumeInformation) | Out-Null
 		}
-		
+
 		Else
 		{
-			Write-Output "No mountpoint found for: " + $volume
+			Write-Output "No mountpoint found for: $Volume"
 		}
+
 	} While ( [PInvoke.Win32Utils]::FindNextVolume([IntPtr] $VolumeHandle, $VolumeName, $Max) )
 
 	Return $VolumeArray

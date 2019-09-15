@@ -57,7 +57,7 @@ $SleepStudy        = Join-Path -Path $PowerReports -ChildPath "power-report.html
 $DriverVerifier    = Join-Path -Path $CrashDumps -ChildPath "driver-verifier.txt"
 
 # Native file and folder locations
-$LocalUserWER      = Join-Path -Path $home -ChildPath "AppData\Local\Microsoft\Windows\WER\ReportArchive" 
+$LocalUserWER      = Join-Path -Path $home -ChildPath "AppData\Local\Microsoft\Windows\WER\ReportArchive"
 $ProgramDataWER    = Join-Path -Path $env:ALLUSERSPROFILE -ChildPath "Microsoft\Windows\WER\ReportArchive"
 $System32          = Join-Path -Path $env:SystemRoot -ChildPath "System32"
 
@@ -89,10 +89,10 @@ If ( $ElevatedCheck -ne "True" )
 $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(1000,1000)
 
 # Get crash dump settings and append crash dump type matrix
-Get-CrashDumpSettings -DestinationPath $CrashDumpSettings
+Get-CrashDumpSetting -DestinationPath $CrashDumpSettings
 
 # Copy mini crash dumps
-Copy-MiniCrashDumps -DestinationPath $CrashDumps -CrashesToCollect $CrashesToCollect
+Copy-MiniCrashDump -DestinationPath $CrashDumps -CrashesToCollect $CrashesToCollect
 
 # Check if a full/kernel/active memory dump exists in the default location and the one specified in the registry
 Get-FullCrashDumpInfo -DestinationPath $CrashDumps
@@ -103,7 +103,7 @@ Write-Output "Getting driver verifier settings..."
 &$VerifierPath /querysettings | Out-File -Append -FilePath $DriverVerifier
 
 # List contents of LiveKernelReports directory if it exists and is not empty
-Get-LiveKernelReports -DestinationPath $CrashLiveReports
+Get-LiveKernelReport -DestinationPath $CrashLiveReports
 
 # Gather a power report
 Write-Output "Running system power report..."
@@ -132,7 +132,7 @@ Write-Output "Identifying running services..."
 If ( $WindowsBuild -ge $Win10MinBuild )
 {
 	$StartType = @{Name="StartType";Expression={(Get-Service $_.Name).StartType}}
-	Get-CimInstance -ClassName Win32_Service | Select-Object Name, DisplayName, State, ProcessID, $StartType | Sort-Object State, Name | Format-Table -AutoSize | Out-File -FilePath $Services	
+	Get-CimInstance -ClassName Win32_Service | Select-Object Name, DisplayName, State, ProcessID, $StartType | Sort-Object State, Name | Format-Table -AutoSize | Out-File -FilePath $Services
 }
 
 Else
@@ -171,9 +171,9 @@ Convert-UTF8 -Path $WER
 If ( Test-Path -Path $AutoRunsPath )
 {
 	Write-Output "Finding auto-start entries..."
-	# -s = Verify digital signatures, -m = List all autostart entries that are not cryptographically signed by Microsoft, -a = specify autostart selection, 
-	# b = boot execute, d = Appinit DLLs, e = explorer add-ons, h = image hijacks, l = logon, t = scheduled tasks, w = winlogon
 
+	# -s = Verify digital signatures, -m = List all autostart entries that are not cryptographically signed by Microsoft, -a = specify autostart selection,
+	# b = boot execute, d = Appinit DLLs, e = explorer add-ons, h = image hijacks, l = logon, t = scheduled tasks, w = winlogon
 	Start-Process -FilePath $AutoRunsPath -ArgumentList "-accepteula","-nobanner","-s","-m","-a","bdehtw" -NoNewWindow -Wait -RedirectStandardOutput $AutoRunsReport
 	Get-CimInstance -ClassName Win32_StartupCommand | Select-Object Name, Command, Location | Format-List | Out-File -Append -FilePath $AutoRunsReport
 	Remove-Item -Path $AutoRunsPath -Force | Out-Null
@@ -201,7 +201,7 @@ If ( Test-Path -Path $TranscriptPath )
 {
 	Stop-Transcript | Out-Null
 
-	# Allow transcript to be moved and read by standard users, otherwise hashing and compression may fail 
+	# Allow transcript to be moved and read by standard users, otherwise hashing and compression may fail
 	$TranscriptACL = Get-ACL -Path $TranscriptPath
 	$TranscriptACL.SetAccessRuleProtection(1,0)
 	$NewAccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule("everyone","full","none","none","Allow")

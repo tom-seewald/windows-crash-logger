@@ -6,7 +6,7 @@
 $ErrorActionPreference = 'Stop'
 
 # Version String
-$ScriptVersion = "V2 Log Collector 1.05 - 9/11/19"
+$ScriptVersion = "V2 Log Collector 1.05 - 9/14/19"
 
 # Default to UTF-8 output
 $PSDefaultParameterValues['*:Encoding'] = 'UTF8'
@@ -55,17 +55,17 @@ If ( [Environment]::Is64BitOperatingSystem -eq $True -and [Environment]::Is64Bit
 # Startup Banner
 Clear-Host
 Write-Output "
-  ______              ______                          _              
- /_  __/__  ____     / ____/___  _______  __________ ( )_____        
-  / / / _ \/ __ \   / /_  / __ \/ ___/ / / / __  __ \|// ___/        
- / / /  __/ / / /  / __/ / /_/ / /  / /_/ / / / / / / (__  )         
-/_/  \___/_/ /_/  /_/    \____/_/   \__,_/_/ /_/ /_/ /____/          
-    __                   ______      ____          __                
-   / /   ____  ______   / ____/___  / / /__  _____/ /_____  _____    
-  / /   / __ \/ __ ` /  / /   / __ \/ / / _ \/ ___/ __/ __ \/ ___/   
- / /___/ /_/ / /_/ /  / /___/ /_/ / / /  __/ /__/ /_/ /_/ / /        
-/_____/\____/\__, /   \____/\____/_/_/\___/\___/\__/\____/_/         
-            /____/                                                   
+  ______              ______                          _
+ /_  __/__  ____     / ____/___  _______  __________ ( )_____
+  / / / _ \/ __ \   / /_  / __ \/ ___/ / / / __  __ \|// ___/
+ / / /  __/ / / /  / __/ / /_/ / /  / /_/ / / / / / / (__  )
+/_/  \___/_/ /_/  /_/    \____/_/   \__,_/_/ /_/ /_/ /____/
+    __                   ______      ____          __
+   / /   ____  ______   / ____/___  / / /__  _____/ /_____  _____
+  / /   / __ \/ __ ` /  / /   / __ \/ / / _ \/ ___/ __/ __ \/ ___/
+ / /___/ /_/ / /_/ /  / /___/ /_/ / / /  __/ /__/ /_/ /_/ / /
+/_____/\____/\__, /   \____/\____/_/_/\___/\___/\__/\____/_/
+            /____/
 "
 
 "`n" * 3
@@ -136,7 +136,7 @@ $DriverQueryPath = Join-Path -Path $System32 -ChildPath "driverquery.exe"
 $DXDiagPath      = Join-Path -Path $System32 -ChildPath "dxdiag.exe"
 $IpconfigPath    = Join-Path -Path $System32 -ChildPath "ipconfig.exe"
 $LicenseDiagPath = Join-Path -Path $System32 -ChildPath "licensingdiag.exe"
-$MsInfo32Path    = Join-Path -Path $System32 -ChildPath "msinfo32.exe" 
+$MsInfo32Path    = Join-Path -Path $System32 -ChildPath "msinfo32.exe"
 $PowerCfgPath    = Join-Path -Path $System32 -ChildPath "powercfg.exe"
 $PowerShellPath  = (Get-Process -PID $PID).Path
 $RoutePath       = Join-Path -Path $System32 -ChildPath "route.exe"
@@ -155,7 +155,7 @@ Import-Module $LoggerModule
 $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(1000,1000)
 
 # Check for pre-existing files and folders, and remove them if they exist
-If ( Test-Path -Path $Path ) 
+If ( Test-Path -Path $Path )
 {
 	Remove-Item -Path $Path -Recurse -Force | Out-Null
 }
@@ -211,7 +211,7 @@ If ( Test-Path -Path $ElevatedScriptPath )
 
 	Catch
 	{
-		Write-Warning "Failed to launch elevated script!" 
+		Write-Warning "Failed to launch elevated script!"
         Write-Output $error[0]
 	}
 }
@@ -261,7 +261,7 @@ Catch
 }
 
 # Export System, Application, and PnP Event Logs
-Export-Events -DestinationPath $EventLogs
+Export-EventLog -DestinationPath $EventLogs
 
 # Driver information
 Write-Output "Gathering device driver information..."
@@ -303,7 +303,7 @@ Get-CimInstance -ClassName Win32_VideoController | Select-Object $GpuAttributes 
 
 # Installed software information
 Write-Output "Listing installed software..."
-Get-InstalledSoftwareKeys -DestinationPath $InstalledSoftware
+Get-InstalledSoftware -DestinationPath $InstalledSoftware
 
 # Installed Windows Updates
 Write-Output "Listing installed Windows updates..."
@@ -328,7 +328,7 @@ Else
 }
 
 # Wait for licensingdiag.exe to finish
-If ( $LicenseDiag -ne $null )
+If ( $LicenseDiag )
 {
 	Wait-Process -ProcessObject $LicenseDiag -ProcessName "licensingdiag.exe" -TimeoutSeconds $LicenseTimeout
 }
@@ -362,23 +362,23 @@ If ( Test-Path -Path $LicenseDiagLog )
 
 Else
 {
-	Write-Information -Message "$LicenseDiagLog does not exist."
+	Write-Information -MessageData "$LicenseDiagLog does not exist."
 }
 
 # Wait for dxdiag.exe to finish
-If ( $DxDiag -ne $null )
+If ( $DxDiag )
 {
 	Wait-Process -ProcessObject $DxDiag -ProcessName "dxdiag.exe" -TimeoutSeconds $DxDiagTimeout
 }
 
 # Wait for driverquery.exe to finish
-If ( $DriverQuery -ne $null )
+If ( $DriverQuery )
 {
 	Wait-Process -ProcessObject $DriverQuery -ProcessName "driverquery.exe" -TimeoutSeconds $DriverQueryTimeout
 }
 
 # Wait for msinfo32.exe to finish
-If ( $MsInfo32 -ne $null )
+If ( $MsInfo32 )
 {
 	Wait-Process -ProcessObject $MsInfo32 -ProcessName "msinfo32.exe" -TimeoutSeconds $MsInfo32Timeout
 }
@@ -392,7 +392,7 @@ If ( !$SystemInfoExists )
 }
 
 # Wait for elevated.ps1 to finish
-If ( $ElevatedScript -ne $null )
+If ( $ElevatedScript )
 {
 	Wait-Process -ProcessObject $ElevatedScript -ProcessName "elevated script" -TimeoutSeconds $ElevatedScriptTimeout
 }
@@ -452,7 +452,7 @@ If ( $ZipExists -eq "True" -and $CompressionResult -eq "True" )
 		Remove-Item -Path $Path -Recurse -Force | Out-Null
 		Write-Output "Output location: $Zip"
 	}
-	
+
 	Else
 	{
 	    Write-Warning "Compression failed, $Zip is empty."
