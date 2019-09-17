@@ -309,7 +309,7 @@ Automatic`t7`t`t`t`t`t<does not exist>
 }
 
 # Combines information from Get-Disk and Get-PhysicalDisk for each disk and outputs it into an array
-Function Get-DiskInformation
+Function Get-DiskInfo
 {
 	$DiskInfoArray = New-Object System.Collections.ArrayList
 	$Disks         = Get-Disk
@@ -934,7 +934,7 @@ Function Get-RemoteFile
 # Returns Volume information, including the actual device path of the volume in the object manager along with the associated drive letter
 Function Get-VolumeInfo
 {
-$Signature = @'
+$Definition = @'
 	[DllImport("kernel32.dll", SetLastError=true)]
 	[return: MarshalAs(UnmanagedType.Bool)]
 	public static extern bool GetVolumePathNamesForVolumeNameW([MarshalAs(UnmanagedType.LPWStr)] string lpszVolumeName,
@@ -952,22 +952,23 @@ $Signature = @'
 	public static extern uint QueryDosDevice(string lpDeviceName, StringBuilder lpTargetPath, int ucchMax);
 '@
 
-	Add-Type -MemberDefinition $Signature -Name Win32Utils -Namespace PInvoke -Using PInvoke,System.Text;
+	Add-Type -MemberDefinition $Definition -Name Win32Utils -Namespace PInvoke -Using PInvoke,System.Text;
 
-	$Max          = 65535
+	$lpcchReturnLength = 0;
+	$Max = 65535
+
 	$VolumeName   = New-Object System.Text.StringBuilder($Max, $Max)
 	$PathName     = New-Object System.Text.StringBuilder($Max, $Max)
 	$MountPoint   = New-Object System.Text.StringBuilder($Max, $Max)
 	$VolumeHandle = [PInvoke.Win32Utils]::FindFirstVolume($VolumeName, $Max)
-
-	$VolumeArray = New-Object System.Collections.ArrayList
-
-	$VolumeWMI = Get-CimInstance -ClassName Win32_Volume
+	$VolumeArray  = New-Object System.Collections.ArrayList
+	$VolumeWMI    = Get-CimInstance -ClassName Win32_Volume
 
 	Do
 	{
-		$Volume = $VolumeName.ToString()
+		$Volume       = $VolumeName.ToString()
 		$ReturnLength = [PInvoke.Win32Utils]::QueryDosDevice($Volume.Substring(4, $Volume.Length - 1 - 4), $PathName, [UInt32] $Max);
+		[PInvoke.Win32Utils]::GetVolumePathNamesForVolumeNameW($Volume, $MountPoint, $Max, [Ref] $lpcchReturnLength) | Out-Null;
 
 		If ( $ReturnLength )
 		{

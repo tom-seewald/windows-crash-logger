@@ -6,7 +6,7 @@
 $ErrorActionPreference = 'Stop'
 
 # Version String
-$ScriptVersion = "V2 Log Collector 1.05 - 9/14/19"
+$ScriptVersion = "V2 Log Collector 1.06 - 9/17/19"
 
 # Default to UTF-8 output
 $PSDefaultParameterValues['*:Encoding'] = 'UTF8'

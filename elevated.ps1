@@ -116,7 +116,7 @@ Write-Output "Running sleep diagnostics..."
 # Disk and partition information
 Get-VolumeInfo | Format-Table -AutoSize | Out-File -Append -FilePath $Partitions
 Get-Partition | Format-List | Out-File -Append -FilePath $Partitions
-Get-DiskInformation | Out-File -FilePath $Disks
+Get-DiskInfo | Out-File -FilePath $Disks
 
 # List PnP devices and associated information
 Write-Output "Listing PnP devices..."
