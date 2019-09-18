@@ -6,7 +6,7 @@
 $ErrorActionPreference = 'Stop'
 
 # Version String
-$ScriptVersion = "V2 Log Collector 1.06 - 9/17/19"
+$ScriptVersion = "V2 Log Collector 1.07 - 9/18/19"
 
 # Default to UTF-8 output
 $PSDefaultParameterValues['*:Encoding'] = 'UTF8'
@@ -142,7 +142,7 @@ $PowerShellPath  = (Get-Process -PID $PID).Path
 $RoutePath       = Join-Path -Path $System32 -ChildPath "route.exe"
 
 # Timeouts for asynchronous processes to complete, in seconds
-$DriverQueryTimeout    = 60
+$DriverQueryTimeout    = 120
 $DxDiagTimeout         = 60
 $ElevatedScriptTimeout = 150
 $LicenseTimeout        = 120

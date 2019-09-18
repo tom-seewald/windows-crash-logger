@@ -131,7 +131,7 @@ Get-CimInstance -ClassName Win32_Process | Select-Object $ProcessAttributes | So
 Write-Output "Identifying running services..."
 If ( $WindowsBuild -ge $Win10MinBuild )
 {
-	$StartType = @{Name="StartType";Expression={(Get-Service $_.Name).StartType}}
+	$StartType = @{Name="StartType";Expression={ (Get-Service -Name $_.Name).StartType }}
 	Get-CimInstance -ClassName Win32_Service | Select-Object Name, DisplayName, State, ProcessID, $StartType | Sort-Object State, Name | Format-Table -AutoSize | Out-File -FilePath $Services
 }
 
@@ -140,14 +140,18 @@ Else
 	Get-CimInstance -ClassName Win32_Service | Select-Object Name, DisplayName, State, ProcessID | Sort-Object State, Name | Format-Table -AutoSize | Out-File -FilePath $Services
 }
 
-# List available Restore Points
-Write-Output "Finding restore points..."
-Get-ComputerRestorePoint | Format-Table -AutoSize | Out-File -FilePath $RestorePoints
-
-# Get information on the OS and its boot/firmware settings
+# Get information about the OS and its boot/firmware settings
 Write-Output "Checking OS details..."
 $Properties = "Name", "Version", "BuildNumber", "OSArchitecture", "LocalDateTime", "LastBootUpTime", "InstallDate", "BootDevice", "SystemDevice"
-Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object $Properties | Out-File -Append -FilePath $OSDetails
+$OsInfo = Get-CimInstance -ClassName Win32_OperatingSystem
+$OsInfo | Select-Object $Properties | Out-File -Append -FilePath $OSDetails
+
+# List available Restore Points if on a client SKU
+If ( $OsInfo.ProductType -eq 1 -and $PSVersionTable.PSEdition -ne "core" )
+{
+	Write-Output "Finding restore points..."
+	Get-ComputerRestorePoint | Format-Table -AutoSize | Out-File -FilePath $RestorePoints
+}
 
 Write-Output "Getting boot information..."
 Get-BootInfo | Format-List | Out-File -Append -FilePath $OSDetails

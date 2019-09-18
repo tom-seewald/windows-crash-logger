@@ -167,7 +167,7 @@ Function Export-EventLog
 		$DestinationPath
 	)
 
-	$EventExportStart = $StopWatchMain.Elapsed.TotalSeconds
+	$StopWatch = [System.Diagnostics.StopWatch]::StartNew()
 
 	$System32     = Join-Path -Path $env:SystemRoot -ChildPath "System32"
 	$WevtUtilPath = Join-Path -Path $System32 -ChildPath "wevtutil.exe"
@@ -197,8 +197,8 @@ Function Export-EventLog
 		Write-Warning "$WevtUtilPath does not exist, cannot export event logs."
 	}
 
-	$EventExportEnd = $StopWatchMain.Elapsed.TotalSeconds
-	$EventExportSec = $EventExportEnd - $EventExportStart
+	$StopWatch.Stop()
+	$EventExportSec = $StopWatch.Elapsed.TotalSeconds
 	Write-Information -MessageData "Event Log export took $EventExportSec seconds."
 }
 
@@ -315,9 +315,18 @@ Function Get-DiskInfo
 	$Disks         = Get-Disk
 	$PhysicalDisks = Get-PhysicalDisk
 
+	If ( !$Disks )
+	{
+		Write-Warning "Get-Disk returned nothing."
+	}
+
+	If ( !$PhysicalDisks )
+	{
+		Write-Warning "Get-PhysicalDisk returned nothing."
+	}
+
 	ForEach ( $Disk in $Disks )
 	{
-
 		# Attempt to match based on Windows uniqueID assigned to each disk
 		If ( $Disk.UniqueId )
 		{
@@ -840,6 +849,12 @@ Function Get-RegKeyProperty
 
 	$RegKeys = Get-ChildItem -Path $Path
 
+	If ( !$RegKeys )
+	{
+		Write-Information -MessageData "$Path is empty"
+		Return $null
+	}
+
 	# The absolute worst-case is that every key in the path is bad, so limit our attempts to that count.
 	$TryLimit = $RegKeys.Count
 	$TryCount = 1
@@ -1028,7 +1043,6 @@ Function Wait-Process
 	{
 		Stop-Process -Force -Id $ProcessObject.Id 2> $null
 		Write-Output "Killed $ProcessName due to $TimeoutSeconds second timeout."
-		Exit
 	}
 
 	If ( $StopWatchLoop.IsRunning )
