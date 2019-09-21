@@ -46,6 +46,7 @@ $AutorunsReport    = Join-Path -Path $Path -ChildPath "autorun.txt"
 $CrashDumpSettings = Join-Path -Path $CrashDumps -ChildPath "crash-dump-settings.txt"
 $CrashLiveReports  = Join-Path -Path $CrashDumps -ChildPath "live-kernel-reports.txt"
 $Disks             = Join-Path -Path $Path -ChildPath "disks.txt"
+$DriverVerifier    = Join-Path -Path $CrashDumps -ChildPath "driver-verifier.txt"
 $OSDetails         = Join-Path -Path $Path -ChildPath "os-details.txt"
 $Partitions        = Join-Path -Path $Path -ChildPath "partitions.txt"
 $PnpDevices        = Join-Path -Path $Path -ChildPath "pnp-devices.txt"
@@ -54,7 +55,7 @@ $RestorePoints	   = Join-Path -Path $Path -ChildPath "restore-points.txt"
 $Services          = Join-Path -Path $Path -ChildPath "services.txt"
 $SleepDiagnostics  = Join-Path -Path $PowerReports -ChildPath "sleep-diagnostics.html"
 $SleepStudy        = Join-Path -Path $PowerReports -ChildPath "power-report.html"
-$DriverVerifier    = Join-Path -Path $CrashDumps -ChildPath "driver-verifier.txt"
+$TranscriptDest    = Join-Path -Path $Path -ChildPath $TranscriptFile
 
 # Native file and folder locations
 $LocalUserWER      = Join-Path -Path $home -ChildPath "AppData\Local\Microsoft\Windows\WER\ReportArchive"
@@ -206,26 +207,22 @@ If ( Test-Path -Path $TranscriptPath )
 	Stop-Transcript | Out-Null
 
 	# Allow transcript to be moved and read by standard users, otherwise hashing and compression may fail
-	$TranscriptACL = Get-ACL -Path $TranscriptPath
-	$TranscriptACL.SetAccessRuleProtection(1,0)
 	$PathACL = Get-ACL -Path $Path
 	Set-Acl -Path $TranscriptPath -AclObject $PathACL -ErrorVariable $SetAclErr
 
 	# Move transcript into $Path
-	Move-Item -Path $TranscriptPath -Destination $Path -Force
-	
+	Move-Item -Path $TranscriptPath -Destination $TranscriptDest -Force
+
 	If ( $SetAclErr )
 	{
-		$AclErrPath = Join-Path -Path $Path -ChildPath $TranscriptFile
-		Write-Output "Failed to set ACL for $TranscriptPath." | Out-File -Append -FilePath $AclErrPath
-		Write-Output $SetAclErr | Out-File -Append -FilePath $AclErrPath
+		Write-Output "Failed to set ACL for $TranscriptPath." | Out-File -Append -FilePath $TranscriptDest
+		Write-Output $SetAclErr | Out-File -Append -FilePath $TranscriptDest
 	}
 }
 
 Else
 {
-	$Output = Join-Path -Path $Path -ChildPath $TranscriptFile
-	Write-Output "$TranscriptPath not found." | Out-File -Append -FilePath $Output
+	Write-Output "$TranscriptPath not found." | Out-File -Append -FilePath $TranscriptDest
 }
 
 # Stop script, it was launched with -NoExit so we must actually stop the process to close the Window

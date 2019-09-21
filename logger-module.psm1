@@ -61,11 +61,6 @@ Function Convert-UTF8
 		{
 			[System.IO.File]::WriteAllLines($FilePath, $Content, $Utf8NoBomEncoding)
 		}
-
-		Else
-		{
-			# Do nothing as the file is empty
-		}
 	}
 }
 
@@ -100,7 +95,7 @@ Function Copy-MiniCrashDump
 	# Always look where the registry points to for minidumps
 	If ( $MinidumpPath -and (Test-Path -Path $MinidumpPath) )
 	{
-		$Report = Get-ChildItem -Path $MinidumpPath | Sort-Object LastWriteTime -Descending | Select-Object Mode,LastWriteTime,$SizeMB,Name
+		$Report = Get-ChildItem -Path $MinidumpPath | Sort-Object LastWriteTime -Descending | Select-Object Mode,LastWriteTime,$SizeMB,FullName
 		$Report | Out-File -Append -FilePath $MiniDumpReport
 
 		$MiniDumpPathContents = Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath
@@ -109,7 +104,7 @@ Function Copy-MiniCrashDump
 		{
 			Write-Output "Copying crash dumps from $MinidumpPath..."
 			$CrashDumps = Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First $CrashesToCollect
-			$CrashDumps	| ForEach-Object { Copy-Item -Path $_.FullName -Destination "$CrashDumps" }
+			$CrashDumps	| ForEach-Object { Copy-Item -Path $_.FullName -Destination $DestinationPath }
 		}
 
 		Else
@@ -130,7 +125,7 @@ Function Copy-MiniCrashDump
 	{
 		If ( Test-Path -Path $DefaultPath )
 		{
-			$Report = Get-ChildItem -Path $DefaultPath | Sort-Object LastWriteTime -Descending | Select-Object Mode,LastWriteTime,$SizeMB,Name
+			$Report = Get-ChildItem -Path $DefaultPath | Sort-Object LastWriteTime -Descending | Select-Object Mode,LastWriteTime,$SizeMB,FullName
 			$Report	| Out-File -Append -FilePath $MiniDumpReport
 
 			$DefaultPathContents = Get-ChildItem -Filter "*.dmp" -Path $DefaultPath
@@ -139,7 +134,7 @@ Function Copy-MiniCrashDump
 			{
 				Write-Output "Copying crash dumps from $DefaultPath..."
 				$CrashDumps = Get-ChildItem -Filter "*.dmp" -Path $DefaultPath  | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First $CrashesToCollect
-				$CrashDumps | ForEach-Object { Copy-Item -Path $_.FullName -Destination "$CrashDumps" }
+				$CrashDumps | ForEach-Object { Copy-Item -Path $_.FullName -Destination $DestinationPath }
 			}
 
 			Else

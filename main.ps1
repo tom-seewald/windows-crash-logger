@@ -6,7 +6,7 @@
 $ErrorActionPreference = 'Stop'
 
 # Version String
-$ScriptVersion = "V2 Log Collector 1.07 - 9/20/19"
+$ScriptVersion = "V2 Log Collector 1.07 - 9/21/19"
 
 # Default to UTF-8 output
 $PSDefaultParameterValues['*:Encoding'] = 'UTF8'
@@ -82,7 +82,7 @@ $StopWatchMain = [System.Diagnostics.StopWatch]::StartNew()
 
 # Log file
 $TranscriptFile = "transcript-main.txt"
-$TranscriptPath = Join-Path $env:TEMP -ChildPath $TranscriptFile
+$TranscriptPath = Join-Path -Path $env:TEMP -ChildPath $TranscriptFile
 
 # Begin logging
 Start-Transcript -Path $TranscriptPath -Force | Out-Null
@@ -117,9 +117,10 @@ $LicenseFileTemp   = Join-Path -Path $env:TEMP -ChildPath "genuine.xml"
 $Motherboard       = Join-Path -Path $Path -ChildPath "motherboard.txt"
 $NetworkInfo       = Join-Path -Path $Path -ChildPath "network-info.txt"
 $PowerPlan         = Join-Path -Path $PowerReports -ChildPath "power-plan.txt"
-$SleepStates       = Join-Path -Path $PowerReports -ChildPath "sleep-states.txt"
 $RAM               = Join-Path -Path $Path -ChildPath "ram.txt"
+$SleepStates       = Join-Path -Path $PowerReports -ChildPath "sleep-states.txt"
 $SystemInfo        = Join-Path -Path $Path -ChildPath "msinfo32.nfo"
+$TranscriptDest    = Join-Path -Path $Path -ChildPath $TranscriptFile
 $WindowsUpdates    = Join-Path -Path $Path -ChildPath "windows-updates.txt"
 $Zip               = $Path + ".zip"
 
@@ -414,12 +415,12 @@ Stop-Transcript | Out-Null
 # Move transcript to $Path
 If ( Test-Path -Path $TranscriptPath )
 {
-    Move-Item -Path $TranscriptPath -Destination $Path -Force
+    Move-Item -Path $TranscriptPath -Destination $TranscriptDest -Force
 }
 
 Else
 {
-	Write-Output "$TranscriptPath not found." | Out-File -Append -FilePath "$Path\transcript-main.txt"
+	Write-Output "$TranscriptPath not found." | Out-File -Append -FilePath $TranscriptDest
 }
 
 # Get hash of files to later check for corruption, we skip .wer files as there can be hundreds of them which can take an excessive amount of time to hash
