@@ -380,26 +380,26 @@ Function Get-DiskInfo
 
 		$DiskInformation =
 		[PSCustomObject]@{
-			"Name"                   = $Disk.FriendlyName;
-			"Model"			         = $Disk.Model;
-			"Manufacturer"	         = $Disk.Manufacturer;
-			"PartNumber"             = $PhysicalDisk.PartNumber;
-			"SerialNumber"	         = $Serial;
-			"MediaType"		         = $PhysicalDisk.MediaType;
-			"BusType"		         = $PhysicalDisk.BusType;
-			"BootDrive"		         = $Disk.IsBoot;
-			"PartitionStyle"         = $Disk.PartitionStyle;
-			"FirmwareVersion"        = $Disk.FirmwareVersion;
-			"Size(GB)"		         = $SizeGB;
-			"GUID"                   = $Disk.Guid;
-			"Temperature"            = $ReliabilityCounter.Temperature;
-			"TemperatureMax"         = $ReliabilityCounter.TemperatureMax;
-			"Wear"                   = $ReliabilityCounter.Wear;
-			"PowerOnHours"           = $ReliabilityCounter.PowerOnHours;
-			"ReadErrorsUncorrected"  = $ReliabilityCounter.ReadErrorsUncorrected;
-			"ReadErrorsCorrected"    = $ReliabilityCounter.ReadErrorsCorrected;
-			"WriteErrorsUncorrected" = $ReliabilityCounter.WriteErrorsUncorrected;
-			"WriteErrorsCorrected"   = $ReliabilityCounter.WriteErrorsCorrected;
+			"Name"                   = $Disk.FriendlyName
+			"Model"			         = $Disk.Model
+			"Manufacturer"	         = $Disk.Manufacturer
+			"PartNumber"             = $PhysicalDisk.PartNumber
+			"SerialNumber"	         = $Serial
+			"MediaType"		         = $PhysicalDisk.MediaType
+			"BusType"		         = $PhysicalDisk.BusType
+			"BootDrive"		         = $Disk.IsBoot
+			"PartitionStyle"         = $Disk.PartitionStyle
+			"FirmwareVersion"        = $Disk.FirmwareVersion
+			"Size(GB)"		         = $SizeGB
+			"GUID"                   = $Disk.Guid
+			"Temperature"            = $ReliabilityCounter.Temperature
+			"TemperatureMax"         = $ReliabilityCounter.TemperatureMax
+			"Wear"                   = $ReliabilityCounter.Wear
+			"PowerOnHours"           = $ReliabilityCounter.PowerOnHours
+			"ReadErrorsUncorrected"  = $ReliabilityCounter.ReadErrorsUncorrected
+			"ReadErrorsCorrected"    = $ReliabilityCounter.ReadErrorsCorrected
+			"WriteErrorsUncorrected" = $ReliabilityCounter.WriteErrorsUncorrected
+			"WriteErrorsCorrected"   = $ReliabilityCounter.WriteErrorsCorrected
 		}
 
 		$DiskInfoArray.Add($DiskInformation) | Out-Null
@@ -827,7 +827,6 @@ Function Get-PnpDeviceInfo
 
 	# List PnP devices and associated information
 	$ErrorCode = @{Name="ErrorCode";Expression={ $_.ConfigManagerErrorCode }}
-	#$ErrorText = @{Name="ErrorText";Expression={ $DeviceManagerErrorTable.($_.ConfigManagerErrorCode -as [int]) }}
 	$ErrorText = @{Name="ErrorText";Expression={ $DeviceManagerErrorTable.([int] $_.ConfigManagerErrorCode) }}
 	$Attributes = "Name", "Status", $ErrorCode, $ErrorText, "Description", "Manufacturer", "DeviceID"
 
@@ -967,9 +966,9 @@ $Definition = @'
 	public static extern uint QueryDosDevice(string lpDeviceName, StringBuilder lpTargetPath, int ucchMax);
 '@
 
-	Add-Type -MemberDefinition $Definition -Name Win32Utils -Namespace PInvoke -Using PInvoke,System.Text;
+	Add-Type -MemberDefinition $Definition -Name Win32Utils -Namespace PInvoke -Using PInvoke,System.Text
 
-	$lpcchReturnLength = 0;
+	$lpcchReturnLength = 0
 	$Max = 65535
 
 	$VolumeName   = New-Object System.Text.StringBuilder($Max, $Max)
@@ -982,8 +981,8 @@ $Definition = @'
 	Do
 	{
 		$Volume       = $VolumeName.ToString()
-		$ReturnLength = [PInvoke.Win32Utils]::QueryDosDevice($Volume.Substring(4, $Volume.Length - 1 - 4), $PathName, [UInt32] $Max);
-		[PInvoke.Win32Utils]::GetVolumePathNamesForVolumeNameW($Volume, $MountPoint, $Max, [Ref] $lpcchReturnLength) | Out-Null;
+		$ReturnLength = [PInvoke.Win32Utils]::QueryDosDevice($Volume.Substring(4, $Volume.Length - 1 - 4), $PathName, [UInt32] $Max)
+		[PInvoke.Win32Utils]::GetVolumePathNamesForVolumeNameW($Volume, $MountPoint, $Max, [Ref] $lpcchReturnLength) | Out-Null
 
 		If ( $ReturnLength )
 		{

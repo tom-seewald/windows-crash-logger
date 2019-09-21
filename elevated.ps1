@@ -208,17 +208,24 @@ If ( Test-Path -Path $TranscriptPath )
 	# Allow transcript to be moved and read by standard users, otherwise hashing and compression may fail
 	$TranscriptACL = Get-ACL -Path $TranscriptPath
 	$TranscriptACL.SetAccessRuleProtection(1,0)
-	$NewAccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule("everyone","full","none","none","Allow")
-	$TranscriptACL.AddAccessRule($NewAccessRule)
-	Set-Acl -Path $TranscriptPath -AclObject $TranscriptACL
+	$PathACL = Get-ACL -Path $Path
+	Set-Acl -Path $TranscriptPath -AclObject $PathACL -ErrorVariable $SetAclErr
 
 	# Move transcript into $Path
 	Move-Item -Path $TranscriptPath -Destination $Path -Force
+	
+	If ( $SetAclErr )
+	{
+		$AclErrPath = Join-Path -Path $Path -ChildPath $TranscriptFile
+		Write-Output "Failed to set ACL for $TranscriptPath." | Out-File -Append -FilePath $AclErrPath
+		Write-Output $SetAclErr | Out-File -Append -FilePath $AclErrPath
+	}
 }
 
 Else
 {
-	Write-Output "$TranscriptPath not found." | Out-File -Append -FilePath "$Path\transcript-elevated.txt"
+	$Output = Join-Path -Path $Path -ChildPath $TranscriptFile
+	Write-Output "$TranscriptPath not found." | Out-File -Append -FilePath $Output
 }
 
 # Stop script, it was launched with -NoExit so we must actually stop the process to close the Window
