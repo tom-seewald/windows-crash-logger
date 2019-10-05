@@ -2,6 +2,9 @@
 # Script Written By Spectrum #
 ##############################
 
+#Requires -Version 4.0
+#Requires -RunAsAdministrator
+
 Param
 (
 	[Parameter(Mandatory=$True)]
@@ -20,8 +23,9 @@ $StopWatchElevated = [System.Diagnostics.StopWatch]::StartNew()
 $PSDefaultParameterValues['*:Encoding'] = 'UTF8'
 
 # Log file
-$TranscriptFile = "transcript-elevated.txt"
-$TranscriptPath = Join-Path -Path $env:TEMP -ChildPath $TranscriptFile
+$TranscriptFile  = "transcript-elevated-" + [System.IO.Path]::GetRandomFileName().split(".")[0] + ".txt"
+$TranscriptFinal = "transcript-elevated.txt"
+$TranscriptPath  = Join-Path -Path $env:TEMP -ChildPath $TranscriptFile
 
 # Begin logging
 Start-Transcript -Path $TranscriptPath -Force | Out-Null
@@ -44,6 +48,7 @@ $WER          = Join-Path -Path $Path -ChildPath "Error Reports"
 # Output files
 $AutorunsReport    = Join-Path -Path $Path -ChildPath "autorun.txt"
 $CrashDumpSettings = Join-Path -Path $CrashDumps -ChildPath "crash-dump-settings.txt"
+$FullDumpReport    = Join-Path -Path $CrashDumps -ChildPath "memory-dumps.txt"
 $CrashLiveReports  = Join-Path -Path $CrashDumps -ChildPath "live-kernel-reports.txt"
 $Disks             = Join-Path -Path $Path -ChildPath "disks.txt"
 $DriverVerifier    = Join-Path -Path $CrashDumps -ChildPath "driver-verifier.txt"
@@ -55,7 +60,7 @@ $RestorePoints	   = Join-Path -Path $Path -ChildPath "restore-points.txt"
 $Services          = Join-Path -Path $Path -ChildPath "services.txt"
 $SleepDiagnostics  = Join-Path -Path $PowerReports -ChildPath "sleep-diagnostics.html"
 $SleepStudy        = Join-Path -Path $PowerReports -ChildPath "power-report.html"
-$TranscriptDest    = Join-Path -Path $Path -ChildPath $TranscriptFile
+$TranscriptDest    = Join-Path -Path $Path -ChildPath $TranscriptFinal
 
 # Native file and folder locations
 $LocalUserWER      = Join-Path -Path $home -ChildPath "AppData\Local\Microsoft\Windows\WER\ReportArchive"
@@ -77,15 +82,6 @@ New-Item -ItemType Directory $WER -Force | Out-Null
 # End of "critical" area, errors will now default to being non-fatal
 $ErrorActionPreference = 'Continue'
 
-# Check that this script is being run with elevated credentials, e.g. Administrator, SYSTEM, or TrustedInstaller
-$ElevatedCheck = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
-
-If ( $ElevatedCheck -ne "True" )
-{
-	Write-Warning "Administrator rights are required for this script to work properly."
-	Return "Script cannot continue."
-}
-
 # Set window size to 1000 by 1000 to avoid truncation when sending output to files
 $Host.UI.RawUI.BufferSize = New-Object Management.Automation.Host.Size(1000,1000)
 
@@ -96,7 +92,7 @@ Get-CrashDumpSetting -DestinationPath $CrashDumpSettings
 Copy-MiniCrashDump -DestinationPath $CrashDumps -CrashesToCollect $CrashesToCollect
 
 # Check if a full/kernel/active memory dump exists in the default location and the one specified in the registry
-Get-FullCrashDumpInfo -DestinationPath $CrashDumps
+Get-FullCrashDumpInfo -DestinationPath $FullDumpReport
 
 # Obtain status of driver verifier
 Write-Output "Getting driver verifier settings..."
@@ -126,26 +122,26 @@ Get-PnPDeviceInfo | Format-Table -AutoSize | Out-File -Append -FilePath $PnpDevi
 # List all processes
 Write-Output "Enumerating running processes..."
 $ProcessAttributes = "ProcessName", "ProcessID", "SessionId", "Priority", "CommandLine"
-Get-CimInstance -ClassName Win32_Process | Select-Object $ProcessAttributes | Sort-Object ProcessName,ProcessId | Format-Table -AutoSize | Out-File -FilePath $Processes
+Get-CimInstance -ClassName Win32_Process | Select-Object -Property $ProcessAttributes | Sort-Object ProcessName,ProcessId | Format-Table -AutoSize | Out-File -FilePath $Processes
 
 # List all services including status, pid, only Windows 10 has support for listing service StartType via Get-Service
 Write-Output "Identifying running services..."
 If ( $WindowsBuild -ge $Win10MinBuild )
 {
 	$StartType = @{Name="StartType";Expression={ (Get-Service -Name $_.Name).StartType }}
-	Get-CimInstance -ClassName Win32_Service | Select-Object Name, DisplayName, State, ProcessID, $StartType | Sort-Object State, Name | Format-Table -AutoSize | Out-File -FilePath $Services
+	Get-CimInstance -ClassName Win32_Service | Select-Object -Property Name,DisplayName,State,ProcessID,$StartType | Sort-Object State, Name | Format-Table -AutoSize | Out-File -FilePath $Services
 }
 
 Else
 {
-	Get-CimInstance -ClassName Win32_Service | Select-Object Name, DisplayName, State, ProcessID | Sort-Object State, Name | Format-Table -AutoSize | Out-File -FilePath $Services
+	Get-CimInstance -ClassName Win32_Service | Select-Object -Property Name,DisplayName,State,ProcessID | Sort-Object State, Name | Format-Table -AutoSize | Out-File -FilePath $Services
 }
 
 # Get information about the OS and its boot/firmware settings
 Write-Output "Checking OS details..."
 $Properties = "Name", "Version", "BuildNumber", "OSArchitecture", "LocalDateTime", "LastBootUpTime", "InstallDate", "BootDevice", "SystemDevice"
 $OsInfo = Get-CimInstance -ClassName Win32_OperatingSystem
-$OsInfo | Select-Object $Properties | Out-File -Append -FilePath $OSDetails
+$OsInfo | Select-Object -Property $Properties | Out-File -Append -FilePath $OSDetails
 
 # List available Restore Points if on a client SKU
 If ( $OsInfo.ProductType -eq 1 -and $PSVersionTable.PSEdition -ne "core" )
@@ -170,7 +166,10 @@ If ( Test-Path -Path $ProgramDataWER )
 }
 
 # Convert WER files to UTF-8 for consistency with the other output
-Convert-UTF8 -Path $WER
+If ( Test-Path -Path $WER )
+{
+	Convert-UTF8 -Path $WER
+}
 
 # Find autostart entries, scheduled tasks etc. with Autorunsc.exe
 If ( Test-Path -Path $AutoRunsPath )
@@ -180,7 +179,8 @@ If ( Test-Path -Path $AutoRunsPath )
 	# -s = Verify digital signatures, -m = List all autostart entries that are not cryptographically signed by Microsoft, -a = specify autostart selection,
 	# b = boot execute, d = Appinit DLLs, e = explorer add-ons, h = image hijacks, l = logon, t = scheduled tasks, w = winlogon
 	Start-Process -FilePath $AutoRunsPath -ArgumentList "-accepteula","-nobanner","-s","-m","-a","bdehtw" -NoNewWindow -Wait -RedirectStandardOutput $AutoRunsReport
-	Get-CimInstance -ClassName Win32_StartupCommand | Select-Object Name, Command, Location | Format-List | Out-File -Append -FilePath $AutoRunsReport
+	Convert-UTF8 -Path $AutoRunsReport
+	Get-CimInstance -ClassName Win32_StartupCommand | Select-Object -Property Name,Command,Location | Format-List | Out-File -Append -FilePath $AutoRunsReport
 	Remove-Item -Path $AutoRunsPath -Force | Out-Null
 }
 

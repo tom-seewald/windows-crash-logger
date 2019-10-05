@@ -81,8 +81,9 @@ Function Copy-MiniCrashDump
 		$CrashesToCollect = 5
 	)
 
-	$SizeMB = @{Name="Size (MB)";Expression={[math]::Round($_.Length / 1MB, 4)}}
-	$CrashSettings  = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
+	$CrashSettings = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
+	$LengthMB      = @{Name="Size (MB)";Expression={[math]::Round($_.Length / 1MB, 2)}}
+	$Properties    = "LastWriteTime", $LengthMB, "FullName"
 
 	If ( Test-Path -Path $CrashSettings )
 	{
@@ -93,9 +94,9 @@ Function Copy-MiniCrashDump
 	$MiniDumpReport = Join-Path -Path $DestinationPath -ChildPath "mini-crash-dumps.txt"
 
 	# Always look where the registry points to for minidumps
-	If ( $MinidumpPath -and (Test-Path -Path $MinidumpPath) )
+	If ( $MinidumpPath -and ( Test-Path -Path $MinidumpPath ) )
 	{
-		$Report = Get-ChildItem -Path $MinidumpPath | Sort-Object LastWriteTime -Descending | Select-Object Mode,LastWriteTime,$SizeMB,FullName
+		$Report = Get-ChildItem -Path $MinidumpPath | Sort-Object LastWriteTime -Descending | Select-Object -Property $Properties
 		$Report | Out-File -Append -FilePath $MiniDumpReport
 
 		$MiniDumpPathContents = Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath
@@ -125,7 +126,7 @@ Function Copy-MiniCrashDump
 	{
 		If ( Test-Path -Path $DefaultPath )
 		{
-			$Report = Get-ChildItem -Path $DefaultPath | Sort-Object LastWriteTime -Descending | Select-Object Mode,LastWriteTime,$SizeMB,FullName
+			$Report = Get-ChildItem -Path $DefaultPath | Sort-Object LastWriteTime -Descending | Select-Object -Property $Properties
 			$Report	| Out-File -Append -FilePath $MiniDumpReport
 
 			$DefaultPathContents = Get-ChildItem -Filter "*.dmp" -Path $DefaultPath
@@ -178,13 +179,13 @@ Function Export-EventLog
 
 		# Export Event Logs
 		Write-Output "Exporting Application event Log..."
-		&$WevtUtilPath query-events Application /q:"$TimeString" /f:text | Out-File -FilePath $AppEvents 2> $null
+		&$WevtUtilPath query-events Application /q:"$TimeString" /f:text | Out-File -FilePath $AppEvents
 
 		Write-Output "Exporting System event log..."
-		&$WevtUtilPath query-events System /q:"$TimeString" /f:text | Out-File -FilePath $SystemEvents 2> $null
+		&$WevtUtilPath query-events System /q:"$TimeString" /f:text | Out-File -FilePath $SystemEvents
 
 		Write-Output "Exporting Kernel PnP event log..."
-		&$WevtUtilPath query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"$TimeString" /f:text | Out-File -FilePath $PnPEvents 2> $null
+		&$WevtUtilPath query-events Microsoft-Windows-Kernel-PnP/Configuration /q:"$TimeString" /f:text | Out-File -FilePath $PnPEvents
 	}
 
 	Else
@@ -269,6 +270,7 @@ Function Get-CrashDumpSetting
 	Param
 	(
 		[Parameter(Mandatory=$True)]
+		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
 		[string]
 		$DestinationPath
 	)
@@ -307,10 +309,10 @@ Automatic`t7`t`t`t`t`t<does not exist>
 Function Get-DiskInfo
 {
 	$DiskInfoArray = New-Object System.Collections.ArrayList
-	$Disks         = Get-Disk
+	$LogicalDisks  = Get-Disk
 	$PhysicalDisks = Get-PhysicalDisk
 
-	If ( !$Disks )
+	If ( !$LogicalDisks )
 	{
 		Write-Warning "Get-Disk returned nothing."
 	}
@@ -320,31 +322,32 @@ Function Get-DiskInfo
 		Write-Warning "Get-PhysicalDisk returned nothing."
 	}
 
-	ForEach ( $Disk in $Disks )
+	[bool]$MatchError = $False
+
+	ForEach ( $LogicalDisk in $LogicalDisks )
 	{
 		# Attempt to match based on Windows uniqueID assigned to each disk
-		If ( $Disk.UniqueId )
+		If ( !$LogicalDisk.UniqueId )
 		{
-			$PhysicalDisk = $PhysicalDisks | Where-Object { $_.UniqueId -eq $Disk.UniqueId }
+			$MatchError = $True
+			Write-Information -MessageData "Logical Disk $($LogicalDisk.FriendlyName) has null UniqueId - cannot find matched physical disk."
 		}
 
-		# If a disk has a null uniqueID, fallback to using the serialnumber as a unique identifier
-		ElseIf ( $Disk.SerialNumber )
+		$PhysicalDisk  = $PhysicalDisks | Where-Object { $_.UniqueId -eq $LogicalDisk.UniqueId }
+		$PhysDiskCount = $PhysicalDisk | Measure-Object | Select-Object -ExpandProperty Count
+
+		If ( $PhysDiskCount -lt 1 )
 		{
-			Write-Warning "Disk has null UniqueId - attempting to match based on SerialNumber"
-			$PhysicalDisk = $PhysicalDisks | Where-Object { $_.SerialNumber -eq $Disk.SerialNumber }
+			$MatchError = $True
+			Write-Information -MessageData "No physical disks matched $($LogicalDisk.FriendlyName)'s uniqueId $($LogicalDisk.UniqueId) to a physical disk."
 		}
 
-		# Both the uniqueID and SerialNumber fields are null, inform user
-		Else
+		# If multiple physical disks have the same uniqueID as the disk, create an array of their sizes
+		ElseIf ( $PhysDiskCount -gt 1 )
 		{
-			Write-Warning "Disk has null UniqueId and null SerialNumber - cannot find matched physical disk."
-		}
+			$MatchError = $True
+			Write-Information -MessageData "Multiple physical disks matched to $($LogicalDisk.FriendlyName), UniqueId is $($LogicalDisk.UniqueId)"
 
-		# If multiple disks have the same uniqueID or SerialNumber create an array of their sizes
-		If ( $PhysicalDisk.Count -ge 1 )
-		{
-			Write-Information -MessageData "Multiple physical disks matched uniqueID $Disk.UniqueId or SerialNumber $Disk.SerialNumber."
 			$SizeGB = @()
 			ForEach ( $PhysDisk in $PhysicalDisk )
 			{
@@ -357,9 +360,9 @@ Function Get-DiskInfo
 			$SizeGB = [math]::Round($PhysicalDisk.Size / 1GB, 2)
 		}
 
-		If ( $Disk.SerialNumber )
+		If ( $LogicalDisk.SerialNumber )
 		{
-			$Serial = $Disk.SerialNumber.Trim()
+			$Serial = $LogicalDisk.SerialNumber.Trim()
 		}
 
 		# Obtain disk reliability statistics
@@ -370,23 +373,22 @@ Function Get-DiskInfo
 
 		Else
 		{
-			Write-Information -MessageData "Did not obtain disk reliability counters for disk $($Disk.FriendlyName) as PhysicalDisk was null."
+			Write-Information -MessageData "Did not obtain disk reliability counters for disk $($LogicalDisk.FriendlyName) as PhysicalDisk was null."
 		}
 
-		$DiskInformation =
-		[PSCustomObject]@{
-			"Name"                   = $Disk.FriendlyName
-			"Model"			         = $Disk.Model
-			"Manufacturer"	         = $Disk.Manufacturer
+		$DiskInformation = [PSCustomObject]@{
+			"Name"                   = $LogicalDisk.FriendlyName
+			"Model"			         = $LogicalDisk.Model
+			"Manufacturer"	         = $LogicalDisk.Manufacturer
 			"PartNumber"             = $PhysicalDisk.PartNumber
 			"SerialNumber"	         = $Serial
 			"MediaType"		         = $PhysicalDisk.MediaType
-			"BusType"		         = $PhysicalDisk.BusType
-			"BootDrive"		         = $Disk.IsBoot
-			"PartitionStyle"         = $Disk.PartitionStyle
-			"FirmwareVersion"        = $Disk.FirmwareVersion
+			"BusType"		         = $LogicalDisk.BusType
+			"BootDrive"		         = $LogicalDisk.IsBoot
+			"PartitionStyle"         = $LogicalDisk.PartitionStyle
+			"FirmwareVersion"        = $LogicalDisk.FirmwareVersion
 			"Size(GB)"		         = $SizeGB
-			"GUID"                   = $Disk.Guid
+			"GUID"                   = $LogicalDisk.Guid
 			"Temperature"            = $ReliabilityCounter.Temperature
 			"TemperatureMax"         = $ReliabilityCounter.TemperatureMax
 			"Wear"                   = $ReliabilityCounter.Wear
@@ -397,7 +399,15 @@ Function Get-DiskInfo
 			"WriteErrorsCorrected"   = $ReliabilityCounter.WriteErrorsCorrected
 		}
 
-		$DiskInfoArray.Add($DiskInformation) | Out-Null
+		$null = $DiskInfoArray.Add($DiskInformation)
+	}
+
+	# If an error was encountered when matching logical disks to physical disks, include the entire output of Get-Disk and Get-PhysicalDisk
+	If ( $MatchError )
+	{
+		Write-Information -MessageData "Disk matching error encountered, adding full output of Get-Disk and Get-PhysicalDisk."
+		$null = $DiskInfoArray.Add($LogicalDisks)
+		$null = $DiskInfoArray.Add($PhysicalDisks)
 	}
 
 	Return $DiskInfoArray
@@ -442,33 +452,35 @@ Function Get-FullCrashDumpInfo
 	Param
 	(
 		[Parameter(Mandatory=$True)]
-		[ValidateScript({ Test-Path -Path $_ })]
+		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
 		[string]
 		$DestinationPath
 	)
 
 	$CrashSettings = "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl"
+	$DefaultPath   = Join-Path -Path $env:SystemRoot -ChildPath "MEMORY.dmp"
+	$LengthMB      = @{Name="Size (MB)";Expression={[math]::Round($_.Length / 1MB, 2)}}
+	$Properties    = "LastWriteTime", $LengthMB, "FullName"
 
 	If ( Test-Path -Path $CrashSettings )
 	{
-		$DumpPath = (Get-ItemProperty -Path $CrashSettings).DumpFile
-	}
-
-	$DefaultPath      = Join-Path -Path $env:SystemRoot -ChildPath "Memory.dmp"
-	$MemoryDumpReport = Join-Path -Path $DestinationPath -ChildPath "memory-dumps.txt"
-
-	If ( $DumpPath -and (Test-Path -Path $DumpPath) )
-	{
-		$DumpPathProperties = Get-Item -Path $DumpPath
-
-		Write-Output "Crash dump found at $DumpPath" | Out-File -Append -FilePath $MemoryDumpReport
-		Write-Output "Creation date: $($DumpPathProperties.LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
-		Write-Output "Size on disk: $([math]::round($DumpPathProperties.Length / 1MB)) MB" | Out-File -Append -FilePath $MemoryDumpReport
+		$DumpPath = Get-ItemProperty -Path $CrashSettings | Select-Object -ExpandProperty "DumpFile"
 	}
 
 	Else
 	{
-		Write-Output "$DumpPath was not found" | Out-File -Append -FilePath $MemoryDumpReport
+		Write-Information -MessageData "$CrashSettings not found."
+	}
+
+	If ( $DumpPath -and ( Test-Path -Path $DumpPath ) )
+	{
+		$DumpPathProperties = Get-Item -Path $DumpPath
+		$DumpPathProperties | Select-Object -Property $Properties | Out-File -Append -FilePath $DestinationPath
+	}
+
+	Else
+	{
+		Write-Output "$DumpPath was not found" | Out-File -Append -FilePath $DestinationPath
 	}
 
 	If ( $DumpPath -ne $DefaultPath )
@@ -476,15 +488,12 @@ Function Get-FullCrashDumpInfo
 		If ( Test-Path -Path $DefaultPath )
 		{
 			$DefaultPathProperties = Get-Item -Path $DefaultPath
-
-			Write-Output "Crash dump found at $DefaultPath" | Out-File -Append -FilePath $MemoryDumpReport
-			Write-Output "Creation date: $($DefaultPathProperties.LastWriteTime)" | Out-File -Append -FilePath $MemoryDumpReport
-			Write-Output "Size on disk: $([math]::round($DefaultPathProperties.Length / 1MB)) MB" | Out-File -Append -FilePath $MemoryDumpReport
+			$DefaultPathProperties | Select-Object -Property $Properties | Out-File -Append -FilePath $DestinationPath
 		}
 
 		Else
 		{
-			Write-Output "$DefaultPath was not found" | Out-File -Append -FilePath $MemoryDumpReport
+			Write-Output "$DefaultPath was not found" | Out-File -Append -FilePath $DestinationPath
 		}
 	}
 }
@@ -513,9 +522,9 @@ Function Get-InstalledSoftware
 
 	$NativeKeyProps = Get-RegKeyProperty -Path $NativeSoftware
 
-	$NativeKeyProps = $NativeKeyProps | Select-Object $SoftwareAttributes
+	$NativeKeyProps = $NativeKeyProps | Select-Object -Property $SoftwareAttributes
 	$NativeKeyProps = $NativeKeyProps | Where-Object { $_.DisplayName -or $_.DisplayVersion -or $_.Publisher -or $_.InstallDate }
-	$NativeKeyProps = $NativeKeyProps | Sort-Object DisplayName | Format-Table -AutoSize
+	$NativeKeyProps = $NativeKeyProps | Sort-Object -Property DisplayName | Format-Table -AutoSize
 
 	$NativeKeyProps | Out-File -Append -FilePath $DestinationPath
 
@@ -526,7 +535,7 @@ Function Get-InstalledSoftware
 
 		$Wow6432KeyProps = Get-RegKeyProperty -Path $Wow6432Software
 
-		$Wow6432KeyProps = $Wow6432KeyProps | Select-Object $SoftwareAttributes
+		$Wow6432KeyProps = $Wow6432KeyProps | Select-Object -Property $SoftwareAttributes
 		$Wow6432KeyProps = $Wow6432KeyProps | Where-Object { $_.DisplayName -or $_.DisplayVersion -or $_.Publisher -or $_.InstallDate }
 		$Wow6432KeyProps = $Wow6432KeyProps | Sort-Object DisplayName | Format-Table -AutoSize
 
@@ -538,7 +547,7 @@ Function Get-InstalledSoftware
 
 	$UserSoftKeyProps = Get-RegKeyProperty -Path $UserSoftware
 
-	$UserSoftKeyProps = $UserSoftKeyProps | Select-Object $SoftwareAttributes
+	$UserSoftKeyProps = $UserSoftKeyProps | Select-Object -Property $SoftwareAttributes
 	$UserSoftKeyProps = $UserSoftKeyProps | Where-Object { $_.DisplayName }
 	$UserSoftKeyProps = $UserSoftKeyProps | Sort-Object DisplayName | Format-Table -AutoSize
 
@@ -549,9 +558,9 @@ Function Get-InstalledSoftware
 
 	$ComponentKeyProps = Get-RegKeyProperty -Path $InstalledComponents
 
-	$ComponentKeyProps = $ComponentKeyProps | Select-Object "(Default)", ComponentID, Version, Enabled
+	$ComponentKeyProps = $ComponentKeyProps | Select-Object -Property "(Default)", ComponentID, Version, Enabled
 	$ComponentKeyProps = $ComponentKeyProps | Where-Object { $_."(Default)" -or $_.ComponentID }
-	$ComponentKeyProps = $ComponentKeyProps | Sort-Object "(default)" | Format-Table -AutoSize
+	$ComponentKeyProps = $ComponentKeyProps | Sort-Object -Property "(default)" | Format-Table -AutoSize
 
 	$ComponentKeyProps | Out-File -Append -FilePath $DestinationPath
 }
@@ -568,15 +577,16 @@ Function Get-LiveKernelReport
 	)
 
 	$LiveReportPath = Join-Path -Path $env:SystemRoot -ChildPath "LiveKernelReports"
+	$LengthMB       = @{Name="Size (MB)";Expression={[math]::Round($_.Length / 1MB, 2)}}
+	$Properties     = "LastWriteTime", $LengthMB, "FullName"
 
 	If ( Test-Path -Path $LiveReportPath )
 	{
-		$LengthMB  = @{Name="Size (MB)";Expression={[math]::Round($_.Length / 1MB, 2)}}
 		$LiveDumps = Get-ChildItem -Filter "*.dmp" -Path $LiveReportPath -Recurse
 
 		If ( $LiveDumps )
 		{
-			$LiveDumps | Select-Object Name,LastWriteTime,$LengthMB | Out-File -FilePath $DestinationPath
+			$LiveDumps | Select-Object -Property $Properties | Out-File -FilePath $DestinationPath
 		}
 
 		Else
@@ -769,7 +779,7 @@ Function Get-MemoryInfo
 			"TypeDetail"   = $TypeDetailArray
 		}
 
-		$DIMMArray.Add($DIMMInfo) | Out-Null
+		$null = $DIMMArray.Add($DIMMInfo)
 	}
 
 	Return $DIMMArray
@@ -825,7 +835,7 @@ Function Get-PnpDeviceInfo
 	$ErrorText = @{Name="ErrorText";Expression={ $DeviceManagerErrorTable.([int] $_.ConfigManagerErrorCode) }}
 	$Attributes = "Name", "Status", $ErrorCode, $ErrorText, "Description", "Manufacturer", "DeviceID"
 
-	$PnpDevices = Get-CimInstance -ClassName Win32_PNPEntity | Select-Object $Attributes | Sort-Object Name
+	$PnpDevices = Get-CimInstance -ClassName Win32_PNPEntity | Select-Object -Property $Attributes | Sort-Object Name
 	Return $PnpDevices
 }
 
@@ -991,7 +1001,7 @@ $Definition = @'
 				"Free (GB)"  = [math]::Round($VolumeInstance.FreeSpace / 1GB, 2)
 			}
 
-			$VolumeArray.Add($VolumeInformation) | Out-Null
+			$null = $VolumeArray.Add($VolumeInformation)
 		}
 
 		Else

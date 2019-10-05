@@ -2,11 +2,13 @@
 # Script Written By Spectrum #
 ##############################
 
+#Requires -Version 4.0
+
 # Any errors at the start should be treated as fatal
 $ErrorActionPreference = 'Stop'
 
 # Version String
-$ScriptVersion = "V2 Log Collector 1.07 - 9/21/19"
+$ScriptVersion = "V2 Log Collector 1.08 - 10/5/19"
 
 # Default to UTF-8 output
 $PSDefaultParameterValues['*:Encoding'] = 'UTF8'
@@ -81,7 +83,8 @@ Clear-Host
 $StopWatchMain = [System.Diagnostics.StopWatch]::StartNew()
 
 # Log file
-$TranscriptFile = "transcript-main.txt"
+$TranscriptFile  = "transcript-main-" + [System.IO.Path]::GetRandomFileName().split(".")[0] + ".txt"
+$TranscriptFinal = "transcript-main.txt"
 $TranscriptPath = Join-Path -Path $env:TEMP -ChildPath $TranscriptFile
 
 # Begin logging
@@ -120,7 +123,7 @@ $PowerPlan         = Join-Path -Path $PowerReports -ChildPath "power-plan.txt"
 $RAM               = Join-Path -Path $Path -ChildPath "ram.txt"
 $SleepStates       = Join-Path -Path $PowerReports -ChildPath "sleep-states.txt"
 $SystemInfo        = Join-Path -Path $Path -ChildPath "msinfo32.nfo"
-$TranscriptDest    = Join-Path -Path $Path -ChildPath $TranscriptFile
+$TranscriptDest    = Join-Path -Path $Path -ChildPath $TranscriptFinal
 $WindowsUpdates    = Join-Path -Path $Path -ChildPath "windows-updates.txt"
 $Zip               = $Path + ".zip"
 
@@ -139,7 +142,7 @@ $IpconfigPath    = Join-Path -Path $System32 -ChildPath "ipconfig.exe"
 $LicenseDiagPath = Join-Path -Path $System32 -ChildPath "licensingdiag.exe"
 $MsInfo32Path    = Join-Path -Path $System32 -ChildPath "msinfo32.exe"
 $PowerCfgPath    = Join-Path -Path $System32 -ChildPath "powercfg.exe"
-$PowerShellPath  = (Get-Process -PID $PID).Path
+$PowerShellPath  = Get-Process -PID $PID | Select-Object -ExpandProperty "Path"
 $RoutePath       = Join-Path -Path $System32 -ChildPath "route.exe"
 
 # Timeouts for asynchronous processes to complete, in seconds
@@ -284,23 +287,23 @@ Get-MemoryInfo | Format-List | Out-File -FilePath $RAM
 $ProcessorAttributes = "Name", "Description", "Manufacturer", "DeviceID", "SocketDesignation", "CurrentClockSpeed", "CPUStatus", `
 					   "LastErrorCode", "ErrorDescription", "PartNumber", "Revision", "SerialNumber", "ProcessorId", "Status", `
 					   "StatusInfo", "Stepping", "CurrentVoltage", "VoltageCaps"
-Get-CimInstance -ClassName Win32_Processor | Select-Object $ProcessorAttributes | Format-List | Out-File -FilePath $CPU
+Get-CimInstance -ClassName Win32_Processor | Select-Object -Property $ProcessorAttributes | Format-List | Out-File -FilePath $CPU
 
 # System Board information
 Write-Output "Motherboard Details" | Out-File -Append -FilePath $Motherboard
 $BaseBoardAttributes = "Product", "Model", "Version", "Manufacturer", "Description, Name, SKU"
-Get-CimInstance -ClassName Win32_BaseBoard | Select-Object $BaseBoardAttributes | Format-List | Out-File -Append -FilePath $Motherboard
+Get-CimInstance -ClassName Win32_BaseBoard | Select-Object -Property $BaseBoardAttributes | Format-List | Out-File -Append -FilePath $Motherboard
 
 # UEFI/BIOS properties
 Write-Output "UEFI/BIOS Details" | Out-File -Append -FilePath $Motherboard
 $BiosAttributes = "SMBIOSBIOSVersion", "Manufacturer", "Name", "Version", "BIOSVersion", "ReleaseDate"
-Get-CimInstance -ClassName Win32_Bios | Select-Object $BiosAttributes | Format-List | Out-File -Append -FilePath $Motherboard
+Get-CimInstance -ClassName Win32_Bios | Select-Object -Property $BiosAttributes | Format-List | Out-File -Append -FilePath $Motherboard
 
 # GPU information
 $GpuAttributes = "Name", "DeviceID", "PNPDeviceID", "VideoProcessor", "CurrentRefreshRate", "VideoModeDescription", "AdapterRAM", `
 				 "DriverVersion", "InfFilename", "InstalledDisplayDrivers", "InstallDate", "DriverDate", "Status", "StatusInfo", `
 				 "LastErrorCode", "ErrorDescription"
-Get-CimInstance -ClassName Win32_VideoController | Select-Object $GpuAttributes | Format-List | Out-File -FilePath $GPU
+Get-CimInstance -ClassName Win32_VideoController | Select-Object -Property $GpuAttributes | Format-List | Out-File -FilePath $GPU
 
 # Installed software information
 Write-Output "Listing installed software..."
@@ -308,7 +311,7 @@ Get-InstalledSoftware -DestinationPath $InstalledSoftware
 
 # Installed Windows Updates
 Write-Output "Listing installed Windows updates..."
-Get-CimInstance -ClassName Win32_QuickFixEngineering | Select-Object HotFixID,Description,InstalledOn | Sort-Object InstalledOn,HotFixID | Format-Table -AutoSize | Out-File -FilePath $WindowsUpdates
+Get-CimInstance -ClassName Win32_QuickFixEngineering | Select-Object -Property HotFixID,Description,InstalledOn | Sort-Object InstalledOn,HotFixID | Format-Table -AutoSize | Out-File -FilePath $WindowsUpdates
 
 # Basic networking information
 Write-Output "Finding network information..."
@@ -427,7 +430,7 @@ Else
 $FileName = @{Name="FileName";Expression={Split-Path $_.Path -Leaf}}
 $FilesToHash = Get-ChildItem -Path $Path -Recurse -Exclude "*.wer" -File
 $Hashes = $FilesToHash | Get-FileHash -Algorithm SHA256
-$Hashes | Select-Object $FileName, Hash, Algorithm | Sort-Object FileName | Format-Table -AutoSize | Out-File -FilePath $FileHashes
+$Hashes | Select-Object -Property $FileName,Hash,Algorithm | Sort-Object FileName | Format-Table -AutoSize | Out-File -FilePath $FileHashes
 
 If ( Test-Path -Path $FileHashes )
 {
