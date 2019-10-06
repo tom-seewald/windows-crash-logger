@@ -311,6 +311,15 @@ Function Get-DiskInfo
 	$DiskInfoArray = New-Object System.Collections.ArrayList
 	$LogicalDisks  = Get-Disk
 	$PhysicalDisks = Get-PhysicalDisk
+	$LogicalCount  = $LogicalDisks | Measure-Object | Select-Object -ExpandProperty Count
+	$PhysicalCount = $PhysicalDisks | Measure-Object | Select-Object -ExpandProperty Count
+	$MatchError    = $False
+
+	If ( $LogicalCount -ne $PhysicalCount )
+	{
+		$MatchError = $True
+		Write-Information -MessageData "Number of logical disks = $LogicalCount, number of physical disks = $PhysicalCount."
+	}
 
 	If ( !$LogicalDisks )
 	{
@@ -321,8 +330,6 @@ Function Get-DiskInfo
 	{
 		Write-Warning "Get-PhysicalDisk returned nothing."
 	}
-
-	[bool]$MatchError = $False
 
 	ForEach ( $LogicalDisk in $LogicalDisks )
 	{

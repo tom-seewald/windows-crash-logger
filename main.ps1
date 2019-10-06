@@ -8,7 +8,7 @@
 $ErrorActionPreference = 'Stop'
 
 # Version String
-$ScriptVersion = "V2 Log Collector 1.08 - 10/5/19"
+$ScriptVersion = "V2 Log Collector 1.08 - 10/06/19"
 
 # Default to UTF-8 output
 $PSDefaultParameterValues['*:Encoding'] = 'UTF8'
@@ -83,7 +83,7 @@ Clear-Host
 $StopWatchMain = [System.Diagnostics.StopWatch]::StartNew()
 
 # Log file
-$TranscriptFile  = "transcript-main-" + [System.IO.Path]::GetRandomFileName().split(".")[0] + ".txt"
+$TranscriptFile  = "transcript-main-" + [System.Guid]::NewGuid().ToString() + ".txt"
 $TranscriptFinal = "transcript-main.txt"
 $TranscriptPath = Join-Path -Path $env:TEMP -ChildPath $TranscriptFile
 
