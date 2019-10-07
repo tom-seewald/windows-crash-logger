@@ -105,7 +105,7 @@ Function Copy-MiniCrashDump
 		{
 			Write-Output "Copying crash dumps from $MinidumpPath..."
 			$CrashDumps = Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First $CrashesToCollect
-			$CrashDumps	| ForEach-Object { Copy-Item -Path $_.FullName -Destination $DestinationPath }
+			$CrashDumps | ForEach-Object { Copy-Item -Path $_.FullName -Destination $DestinationPath }
 		}
 
 		Else
@@ -385,16 +385,16 @@ Function Get-DiskInfo
 
 		$DiskInformation = [PSCustomObject]@{
 			"Name"                   = $LogicalDisk.FriendlyName
-			"Model"			         = $LogicalDisk.Model
+			"Model"                  = $LogicalDisk.Model
 			"Manufacturer"	         = $LogicalDisk.Manufacturer
 			"PartNumber"             = $PhysicalDisk.PartNumber
 			"SerialNumber"	         = $Serial
-			"MediaType"		         = $PhysicalDisk.MediaType
-			"BusType"		         = $LogicalDisk.BusType
-			"BootDrive"		         = $LogicalDisk.IsBoot
+			"MediaType"              = $PhysicalDisk.MediaType
+			"BusType"                = $LogicalDisk.BusType
+			"BootDrive"              = $LogicalDisk.IsBoot
 			"PartitionStyle"         = $LogicalDisk.PartitionStyle
 			"FirmwareVersion"        = $LogicalDisk.FirmwareVersion
-			"Size(GB)"		         = $SizeGB
+			"Size(GB)"               = $SizeGB
 			"GUID"                   = $LogicalDisk.Guid
 			"Temperature"            = $ReliabilityCounter.Temperature
 			"TemperatureMax"         = $ReliabilityCounter.TemperatureMax
@@ -447,8 +447,8 @@ Function Get-FirmwareType
 
 	Switch ($Result)
 	{
-		1		{ Return "BIOS" }
-		2   	{ Return "UEFI" }
+		1       { Return "BIOS" }
+		2       { Return "UEFI" }
 		Default { Return "Unknown - $Result" }
 	}
 }
@@ -773,16 +773,16 @@ Function Get-MemoryInfo
 
 		# Construct object containing gathered information
 		$DIMMInfo = [PSCustomObject]@{
-			"Location"	   = $DIMM.DeviceLocator
-			"BankLabel"	   = $DIMM.BankLabel
+			"Location"     = $DIMM.DeviceLocator
+			"BankLabel"    = $DIMM.BankLabel
 			"Manufacturer" = $DIMM.Manufacturer
 			"MemoryType"   = $SMBIOSType
 			"FormFactor"   = $FormFactor
 			"Capacity"     = $Capacity
-			"Speed"		   = $DIMM.Speed
-			"Serial"	   = $DIMM.SerialNumber
+			"Speed"        = $DIMM.Speed
+			"Serial"       = $DIMM.SerialNumber
 			"PartNumber"   = $DIMM.PartNumber
-			"ECC"		   = $ECC
+			"ECC"          = $ECC
 			"TypeDetail"   = $TypeDetailArray
 		}
 
@@ -838,11 +838,11 @@ Function Get-PnpDeviceInfo
 	}
 
 	# List PnP devices and associated information
-	$ErrorCode = @{Name="ErrorCode";Expression={ $_.ConfigManagerErrorCode }}
-	$ErrorText = @{Name="ErrorText";Expression={ $DeviceManagerErrorTable.([int] $_.ConfigManagerErrorCode) }}
+	$ErrorCode  = @{Name="ErrorCode";Expression={ $_.ConfigManagerErrorCode }}
+	$ErrorText  = @{Name="ErrorText";Expression={ $DeviceManagerErrorTable.([int] $_.ConfigManagerErrorCode) }}
 	$Attributes = "Name", "Status", $ErrorCode, $ErrorText, "Description", "Manufacturer", "DeviceID"
-
 	$PnpDevices = Get-CimInstance -ClassName Win32_PNPEntity | Select-Object -Property $Attributes | Sort-Object Name
+
 	Return $PnpDevices
 }
 
@@ -921,17 +921,17 @@ Function Get-RemoteFile
 	(
         [Parameter(Mandatory=$True)]
         [string]
-		$URL,
-		[Parameter(Mandatory=$True)]
+        $URL,
+        [Parameter(Mandatory=$True)]
         [string]
-		$FileName,
-		[Parameter(Mandatory=$True)]
-		[ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
+        $FileName,
+        [Parameter(Mandatory=$True)]
+        [ValidateScript({ Test-Path -Path (Split-Path -Path $_ -Parent) })]
         [string]
-		$DestinationPath,
-		[Parameter(Mandatory=$False)]
-		[ValidateRange(1,120)]
-		$TimeoutSeconds = 30
+        $DestinationPath,
+        [Parameter(Mandatory=$False)]
+        [ValidateRange(1,120)]
+        $TimeoutSeconds = 30
 	)
 
     Write-Output "Downloading $FileName..."
@@ -1004,8 +1004,8 @@ $Definition = @'
 				DriveLetter = $MountPoint.ToString()
 				DevicePath  = $PathName.ToString()
 				VolumeGUID  = $Volume
-				"Size (GB)"  = [math]::Round($VolumeInstance.Capacity / 1GB, 2)
-				"Free (GB)"  = [math]::Round($VolumeInstance.FreeSpace / 1GB, 2)
+				"Size (GB)" = [math]::Round($VolumeInstance.Capacity / 1GB, 2)
+				"Free (GB)" = [math]::Round($VolumeInstance.FreeSpace / 1GB, 2)
 			}
 
 			$null = $VolumeArray.Add($VolumeInformation)
@@ -1026,10 +1026,10 @@ Function Wait-Process
 {
 	Param
 	(
-		[Parameter(Mandatory=$True)]
-		$ProcessObject,
-		[Parameter(Mandatory=$True)]
-		[string]
+        [Parameter(Mandatory=$True)]
+        $ProcessObject,
+        [Parameter(Mandatory=$True)]
+        [string]
         $ProcessName,
         [Parameter(Mandatory=$True)]
         [int]

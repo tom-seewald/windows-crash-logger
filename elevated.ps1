@@ -23,7 +23,8 @@ $StopWatchElevated = [System.Diagnostics.StopWatch]::StartNew()
 $PSDefaultParameterValues['*:Encoding'] = 'UTF8'
 
 # Log file
-$TranscriptFile  = "transcript-elevated-" + [System.Guid]::NewGuid().ToString() + ".txt"
+$Guid = [System.Guid]::NewGuid().ToString()
+$TranscriptFile  = "transcript-elevated-" + $Guid + ".txt"
 $TranscriptFinal = "transcript-elevated.txt"
 $TranscriptPath  = Join-Path -Path $env:TEMP -ChildPath $TranscriptFile
 
