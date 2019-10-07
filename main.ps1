@@ -456,15 +456,15 @@ If ( $ZipExists -eq "True" -and $CompressionResult -eq "True" )
 
 	If ( $ZipSize -gt 1 )
 	{
-		Remove-Item -Path $Path -Recurse -Force | Out-Null
-		Write-Output "Output location: $Zip"
+            Remove-Item -Path $Path -Recurse -Force | Out-Null
+            Write-Output "Output location: $Zip"
 	}
 
 	Else
 	{
-	    Write-Warning "Compression failed, $Zip is empty."
-		Write-Output "`n"
-		Write-Output "Output location: $Path"
+            Write-Warning "Compression failed, $Zip is empty."
+            Write-Output "`n"
+            Write-Output "Output location: $Path"
 	}
 }
 
