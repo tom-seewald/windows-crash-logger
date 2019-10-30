@@ -116,7 +116,7 @@ Write-Output "Running sleep diagnostics..."
 &$PowerCfgPath /systemsleepdiagnostics /output $SleepDiagnostics 2> $null | Out-Null
 
 # Disk and partition information
-Get-VolumeInfo | Format-Table -AutoSize | Out-File -Append -FilePath $Partitions
+Get-VolumeInfo | Sort-Object -Property DevicePath | Format-Table -AutoSize | Out-File -Append -FilePath $Partitions
 Get-Partition | Format-List | Out-File -Append -FilePath $Partitions
 Get-DiskInfo | Out-File -FilePath $Disks
 
