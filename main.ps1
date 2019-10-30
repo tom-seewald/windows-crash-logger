@@ -8,7 +8,7 @@
 $ErrorActionPreference = 'Stop'
 
 # Version String
-$ScriptVersion = "V2 Log Collector 1.08 - 10/06/19"
+$ScriptVersion = "V2 Log Collector 1.08 - 10/30/19"
 
 # Default to UTF-8 output
 $PSDefaultParameterValues['*:Encoding'] = 'UTF8'
@@ -86,11 +86,12 @@ $StopWatchMain = [System.Diagnostics.StopWatch]::StartNew()
 $Guid = [System.Guid]::NewGuid().ToString()
 $TranscriptFile  = "transcript-main-" + $Guid + ".txt"
 $TranscriptFinal = "transcript-main.txt"
-$TranscriptPath = Join-Path -Path $env:TEMP -ChildPath $TranscriptFile
+$TranscriptPath  = Join-Path -Path $env:TEMP -ChildPath $TranscriptFile
 
 # Begin logging
 Start-Transcript -Path $TranscriptPath -Force | Out-Null
 Write-Information -MessageData $ScriptVersion
+Write-Information -MessageData $Guid
 
 # Create folder name
 $Time       = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
@@ -211,7 +212,7 @@ If ( Test-Path -Path $ElevatedScriptPath )
 	Try
 	{
 		$ElevatedScript = Start-Process -FilePath $PowerShellPath `
-										-ArgumentList """-ExecutionPolicy"" ""Bypass"" ""-NonInteractive"" ""-NoProfile"" ""-NoExit"" ""-File"" ""$ElevatedScriptPath"" ""$Path""" `
+										-ArgumentList """-ExecutionPolicy"" ""Bypass"" ""-NonInteractive"" ""-NoProfile"" ""-NoExit"" ""-File"" ""$ElevatedScriptPath"" ""$Path"" ""$Guid""" `
 										-Verb RunAs `
 										-PassThru
 	}
@@ -395,7 +396,7 @@ $SystemInfoExists = Test-Path -Path $SystemInfo
 
 If ( !$SystemInfoExists )
 {
-	Write-Warning "$SystemInfo not found, msinfo32 may have crashed or was canceled by the user."
+	Write-Warning "$SystemInfo not found, msinfo32.exe may have crashed or was canceled by the user."
 }
 
 # Wait for elevated.ps1 to finish
@@ -456,15 +457,15 @@ If ( $ZipExists -eq "True" -and $CompressionResult -eq "True" )
 
 	If ( $ZipSize -gt 1 )
 	{
-            Remove-Item -Path $Path -Recurse -Force | Out-Null
-            Write-Output "Output location: $Zip"
+		Remove-Item -Path $Path -Recurse -Force | Out-Null
+		Write-Output "Output location: $Zip"
 	}
 
 	Else
 	{
-            Write-Warning "Compression failed, $Zip is empty."
-            Write-Output "`n"
-            Write-Output "Output location: $Path"
+	    Write-Warning "Compression failed, $Zip is empty."
+		Write-Output "`n"
+		Write-Output "Output location: $Path"
 	}
 }
 

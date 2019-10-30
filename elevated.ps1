@@ -10,7 +10,10 @@ Param
 	[Parameter(Mandatory=$True)]
 	[ValidateScript({ Test-Path -Path $_ })]
 	[string]
-	$Path
+	$Path,
+	[ValidateNotNullorEmpty()]
+	[string]
+	$Guid
 )
 
 # Any errors at the start should be treated as fatal
@@ -23,13 +26,14 @@ $StopWatchElevated = [System.Diagnostics.StopWatch]::StartNew()
 $PSDefaultParameterValues['*:Encoding'] = 'UTF8'
 
 # Log file
-$Guid = [System.Guid]::NewGuid().ToString()
+#$Guid = [System.Guid]::NewGuid().ToString()
 $TranscriptFile  = "transcript-elevated-" + $Guid + ".txt"
 $TranscriptFinal = "transcript-elevated.txt"
 $TranscriptPath  = Join-Path -Path $env:TEMP -ChildPath $TranscriptFile
 
 # Begin logging
 Start-Transcript -Path $TranscriptPath -Force | Out-Null
+Write-Information -MessageData $Guid
 
 # Detect Windows version
 $WindowsBuild  = [System.Environment]::OSVersion.Version.Build
