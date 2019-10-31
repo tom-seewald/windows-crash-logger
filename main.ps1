@@ -8,7 +8,7 @@
 $ErrorActionPreference = 'Stop'
 
 # Version String
-$ScriptVersion = "V2 Log Collector 1.08 - 10/30/19"
+$ScriptVersion = "V2 Log Collector 1.08 - 10/31/19"
 
 # Default to UTF-8 output
 $PSDefaultParameterValues['*:Encoding'] = 'UTF8'
@@ -295,7 +295,7 @@ Get-CimInstance -ClassName Win32_Processor | Select-Object -Property $ProcessorA
 
 # System Board information
 Write-Output "Motherboard Details" | Out-File -Append -FilePath $Motherboard
-$BaseBoardAttributes = "Product", "Model", "Version", "Manufacturer", "Description, Name, SKU"
+$BaseBoardAttributes = "Product", "Model", "Version", "Manufacturer", "Description", "Name", "SKU"
 Get-CimInstance -ClassName Win32_BaseBoard | Select-Object -Property $BaseBoardAttributes | Format-List | Out-File -Append -FilePath $Motherboard
 
 # UEFI/BIOS properties
