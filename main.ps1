@@ -8,7 +8,7 @@
 $ErrorActionPreference = 'Stop'
 
 # Version String
-$ScriptVersion = "V2 Log Collector 1.08 - 10/31/19"
+$ScriptVersion = "V2 Log Collector 1.09 - 12/27/19"
 
 # Default to UTF-8 output
 $PSDefaultParameterValues['*:Encoding'] = 'UTF8'
@@ -274,7 +274,7 @@ Export-EventLog -DestinationPath $EventLogs
 # Driver information
 Write-Output "Gathering device driver information..."
 $DriverInfoAttributes = "DeviceName", "FriendlyName", "InfName", "DriverVersion", "DeviceID", "IsSigned", "DriverDate"
-Get-CimInstance -ClassName Win32_PnPSignedDriver | Select-Object -Property $DriverInfoAttributes | Sort-Object DeviceName | Format-Table -AutoSize | Out-File -FilePath $DriverVersions
+Get-CimInstance -ClassName Win32_PnPSignedDriver | Select-Object -Property $DriverInfoAttributes | Sort-Object -Property DeviceName | Format-Table -AutoSize | Out-File -FilePath $DriverVersions
 
 # Get default power plan
 Write-Output "Checking power settings..."
@@ -315,7 +315,7 @@ Get-InstalledSoftware -DestinationPath $InstalledSoftware
 
 # Installed Windows Updates
 Write-Output "Listing installed Windows updates..."
-Get-CimInstance -ClassName Win32_QuickFixEngineering | Select-Object -Property HotFixID,Description,InstalledOn | Sort-Object InstalledOn,HotFixID | Format-Table -AutoSize | Out-File -FilePath $WindowsUpdates
+Get-CimInstance -ClassName Win32_QuickFixEngineering | Select-Object -Property HotFixID,Description,InstalledOn | Sort-Object -Property InstalledOn,HotFixID | Format-Table -AutoSize | Out-File -FilePath $WindowsUpdates
 
 # Basic networking information
 Write-Output "Finding network information..."
@@ -434,7 +434,7 @@ Else
 $FileName = @{Name="FileName";Expression={Split-Path $_.Path -Leaf}}
 $FilesToHash = Get-ChildItem -Path $Path -Recurse -Exclude "*.wer" -File
 $Hashes = $FilesToHash | Get-FileHash -Algorithm SHA256
-$Hashes | Select-Object -Property $FileName,Hash,Algorithm | Sort-Object FileName | Format-Table -AutoSize | Out-File -FilePath $FileHashes
+$Hashes | Select-Object -Property $FileName,Hash,Algorithm | Sort-Object -Property FileName | Format-Table -AutoSize | Out-File -FilePath $FileHashes
 
 If ( Test-Path -Path $FileHashes )
 {

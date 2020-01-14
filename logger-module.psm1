@@ -96,7 +96,7 @@ Function Copy-MiniCrashDump
 	# Always look where the registry points to for minidumps
 	If ( $MinidumpPath -and ( Test-Path -Path $MinidumpPath ) )
 	{
-		$Report = Get-ChildItem -Path $MinidumpPath | Sort-Object LastWriteTime -Descending | Select-Object -Property $Properties
+		$Report = Get-ChildItem -Path $MinidumpPath | Sort-Object -Property LastWriteTime -Descending | Select-Object -Property $Properties
 		$Report | Out-File -Append -FilePath $MiniDumpReport
 
 		$MiniDumpPathContents = Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath
@@ -104,7 +104,7 @@ Function Copy-MiniCrashDump
 		If ( $MiniDumpPathContents )
 		{
 			Write-Output "Copying crash dumps from $MinidumpPath..."
-			$CrashDumps = Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First $CrashesToCollect
+			$CrashDumps = Get-ChildItem -Filter "*.dmp" -Path $MinidumpPath | Where-Object { $_.Length -gt 0 } | Sort-Object -Property LastWriteTime -Descending | Select-Object -First $CrashesToCollect
 			$CrashDumps | ForEach-Object { Copy-Item -Path $_.FullName -Destination $DestinationPath }
 		}
 
@@ -126,7 +126,7 @@ Function Copy-MiniCrashDump
 	{
 		If ( Test-Path -Path $DefaultPath )
 		{
-			$Report = Get-ChildItem -Path $DefaultPath | Sort-Object LastWriteTime -Descending | Select-Object -Property $Properties
+			$Report = Get-ChildItem -Path $DefaultPath | Sort-Object -Property LastWriteTime -Descending | Select-Object -Property $Properties
 			$Report	| Out-File -Append -FilePath $MiniDumpReport
 
 			$DefaultPathContents = Get-ChildItem -Filter "*.dmp" -Path $DefaultPath
@@ -134,7 +134,7 @@ Function Copy-MiniCrashDump
 			If ( $DefaultPathContents )
 			{
 				Write-Output "Copying crash dumps from $DefaultPath..."
-				$CrashDumps = Get-ChildItem -Filter "*.dmp" -Path $DefaultPath  | Where-Object { $_.Length -gt 0 } | Sort-Object -Descending LastWriteTime | Select-Object -First $CrashesToCollect
+				$CrashDumps = Get-ChildItem -Filter "*.dmp" -Path $DefaultPath  | Where-Object { $_.Length -gt 0 } | Sort-Object -Property LastWriteTime -Descending | Select-Object -First $CrashesToCollect
 				$CrashDumps | ForEach-Object { Copy-Item -Path $_.FullName -Destination $DestinationPath }
 			}
 
@@ -323,11 +323,13 @@ Function Get-DiskInfo
 
 	If ( !$LogicalDisks )
 	{
+		$MatchError = $True
 		Write-Warning "Get-Disk returned nothing."
 	}
 
 	If ( !$PhysicalDisks )
 	{
+		$MatchError = $True
 		Write-Warning "Get-PhysicalDisk returned nothing."
 	}
 
@@ -353,7 +355,7 @@ Function Get-DiskInfo
 		ElseIf ( $PhysDiskCount -gt 1 )
 		{
 			$MatchError = $True
-			Write-Information -MessageData "Multiple physical disks matched to $($LogicalDisk.FriendlyName), UniqueId is $($LogicalDisk.UniqueId)"
+			Write-Information -MessageData "Multiple physical disks matched to $($LogicalDisk.FriendlyName), UniqueId is $($LogicalDisk.UniqueId)."
 
 			$SizeGB = @()
 			ForEach ( $PhysDisk in $PhysicalDisk )
@@ -380,6 +382,7 @@ Function Get-DiskInfo
 
 		Else
 		{
+			$ReliabilityCounter = $null
 			Write-Information -MessageData "Did not obtain disk reliability counters for disk $($LogicalDisk.FriendlyName) as PhysicalDisk was null."
 		}
 
@@ -544,7 +547,7 @@ Function Get-InstalledSoftware
 
 		$Wow6432KeyProps = $Wow6432KeyProps | Select-Object -Property $SoftwareAttributes
 		$Wow6432KeyProps = $Wow6432KeyProps | Where-Object { $_.DisplayName -or $_.DisplayVersion -or $_.Publisher -or $_.InstallDate }
-		$Wow6432KeyProps = $Wow6432KeyProps | Sort-Object DisplayName | Format-Table -AutoSize
+		$Wow6432KeyProps = $Wow6432KeyProps | Sort-Object -Property DisplayName | Format-Table -AutoSize
 
 		$Wow6432KeyProps | Out-File -Append -FilePath $DestinationPath
     }
@@ -556,7 +559,7 @@ Function Get-InstalledSoftware
 
 	$UserSoftKeyProps = $UserSoftKeyProps | Select-Object -Property $SoftwareAttributes
 	$UserSoftKeyProps = $UserSoftKeyProps | Where-Object { $_.DisplayName }
-	$UserSoftKeyProps = $UserSoftKeyProps | Sort-Object DisplayName | Format-Table -AutoSize
+	$UserSoftKeyProps = $UserSoftKeyProps | Sort-Object -Property DisplayName | Format-Table -AutoSize
 
 	$UserSoftKeyProps | Out-File -Append -FilePath $DestinationPath
 
@@ -740,7 +743,7 @@ Function Get-MemoryInfo
 			$ECC = "False"
 		}
 
-		# Get TypeDetail and convert it
+		# Convert the raw TypeDetail data to a human-readable format
 		If ( $DIMM.TypeDetail )
 		{
 			$TypeDetailBitField = [Convert]::ToString($DIMM.TypeDetail,2)
@@ -752,7 +755,7 @@ Function Get-MemoryInfo
 			$TypeDetailArray = @()
 
 			# Loop through each bit in $TypeDetailBitField, convert every matching entry to a human-readable label
-			for ( $i=0; $i -le ($BitFieldLength - 1); $i++ )
+			for ( $i = 0; $i -le ($BitFieldLength - 1); $i++ )
 			{
 				If ( $TypeDetailBitField[$i] -eq "1" )
 				{
@@ -841,7 +844,7 @@ Function Get-PnpDeviceInfo
 	$ErrorCode  = @{Name="ErrorCode";Expression={ $_.ConfigManagerErrorCode }}
 	$ErrorText  = @{Name="ErrorText";Expression={ $DeviceManagerErrorTable.([int] $_.ConfigManagerErrorCode) }}
 	$Attributes = "Name", "Status", $ErrorCode, $ErrorText, "Description", "Manufacturer", "DeviceID"
-	$PnpDevices = Get-CimInstance -ClassName Win32_PNPEntity | Select-Object -Property $Attributes | Sort-Object Name
+	$PnpDevices = Get-CimInstance -ClassName Win32_PNPEntity | Select-Object -Property $Attributes | Sort-Object -Property Name
 
 	Return $PnpDevices
 }

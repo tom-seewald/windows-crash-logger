@@ -26,7 +26,6 @@ $StopWatchElevated = [System.Diagnostics.StopWatch]::StartNew()
 $PSDefaultParameterValues['*:Encoding'] = 'UTF8'
 
 # Log file
-#$Guid = [System.Guid]::NewGuid().ToString()
 $TranscriptFile  = "transcript-elevated-" + $Guid + ".txt"
 $TranscriptFinal = "transcript-elevated.txt"
 $TranscriptPath  = Join-Path -Path $env:TEMP -ChildPath $TranscriptFile
@@ -68,9 +67,9 @@ $SleepStudy        = Join-Path -Path $PowerReports -ChildPath "power-report.html
 $TranscriptDest    = Join-Path -Path $Path -ChildPath $TranscriptFinal
 
 # Native file and folder locations
-$LocalUserWER      = Join-Path -Path $home -ChildPath "AppData\Local\Microsoft\Windows\WER\ReportArchive"
-$ProgramDataWER    = Join-Path -Path $env:ALLUSERSPROFILE -ChildPath "Microsoft\Windows\WER\ReportArchive"
-$System32          = Join-Path -Path $env:SystemRoot -ChildPath "System32"
+$LocalUserWER   = Join-Path -Path $home -ChildPath "AppData\Local\Microsoft\Windows\WER\ReportArchive"
+$ProgramDataWER = Join-Path -Path $env:ALLUSERSPROFILE -ChildPath "Microsoft\Windows\WER\ReportArchive"
+$System32       = Join-Path -Path $env:SystemRoot -ChildPath "System32"
 
 # Full paths of executables used in this script, in case the system's path environment variables have been messed with
 $AutoRunsPath = Join-Path -Path $PSScriptRoot -ChildPath "autorunsc.exe"
@@ -109,7 +108,7 @@ Get-LiveKernelReport -DestinationPath $CrashLiveReports
 
 # Gather a power report
 Write-Output "Running system power report..."
-&$PowerCfgPath /sleepstudy /output $SleepStudy 2> $null| Out-Null
+&$PowerCfgPath /sleepstudy /output $SleepStudy 2> $null | Out-Null
 
 # Run a sleep diagnostics report
 Write-Output "Running sleep diagnostics..."
@@ -127,19 +126,19 @@ Get-PnPDeviceInfo | Format-Table -AutoSize | Out-File -Append -FilePath $PnpDevi
 # List all processes
 Write-Output "Enumerating running processes..."
 $ProcessAttributes = "ProcessName", "ProcessID", "SessionId", "Priority", "CommandLine"
-Get-CimInstance -ClassName Win32_Process | Select-Object -Property $ProcessAttributes | Sort-Object ProcessName,ProcessId | Format-Table -AutoSize | Out-File -FilePath $Processes
+Get-CimInstance -ClassName Win32_Process | Select-Object -Property $ProcessAttributes | Sort-Object -Property ProcessName,ProcessId | Format-Table -AutoSize | Out-File -FilePath $Processes
 
 # List all services including status, pid, only Windows 10 has support for listing service StartType via Get-Service
 Write-Output "Identifying running services..."
 If ( $WindowsBuild -ge $Win10MinBuild )
 {
 	$StartType = @{Name="StartType";Expression={ (Get-Service -Name $_.Name).StartType }}
-	Get-CimInstance -ClassName Win32_Service | Select-Object -Property Name,DisplayName,State,ProcessID,$StartType | Sort-Object State, Name | Format-Table -AutoSize | Out-File -FilePath $Services
+	Get-CimInstance -ClassName Win32_Service | Select-Object -Property Name,DisplayName,State,ProcessID,$StartType | Sort-Object -Property State, Name | Format-Table -AutoSize | Out-File -FilePath $Services
 }
 
 Else
 {
-	Get-CimInstance -ClassName Win32_Service | Select-Object -Property Name,DisplayName,State,ProcessID | Sort-Object State, Name | Format-Table -AutoSize | Out-File -FilePath $Services
+	Get-CimInstance -ClassName Win32_Service | Select-Object -Property Name,DisplayName,State,ProcessID | Sort-Object -Property State, Name | Format-Table -AutoSize | Out-File -FilePath $Services
 }
 
 # Get information about the OS and its boot/firmware settings
