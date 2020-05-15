@@ -347,11 +347,50 @@ Function Get-DiskInfo
 
 		If ( $PhysDiskCount -lt 1 )
 		{
-			$MatchError = $True
 			Write-Information -MessageData "No physical disks matched $($LogicalDisk.FriendlyName)'s uniqueId $($LogicalDisk.UniqueId) to a physical disk."
+
+			# Try matching by serial number if uniqueId fails to find a unique match
+			If ( $LogicalDisk.SerialNumber )
+			{
+				$PhysicalDisk  = $PhysicalDisks | Where-Object { $_.SerialNumber -eq $LogicalDisk.SerialNumber }
+				$PhysDiskCount = $PhysicalDisk | Measure-Object | Select-Object -ExpandProperty Count
+
+				# No physical disks matched the serial number
+				If ( $PhysDiskCount -lt 1 )
+				{
+					$MatchError = $True
+					Write-Information -MessageData "No physical disks matched $($LogicalDisk.FriendlyName)'s serial number $($LogicalDisk.UniqueId) to a physical disk."
+				}
+
+				# Multiple physical disks matched the serial number
+				ElseIf ( $PhysDiskCount -gt 1 )
+				{
+					$MatchError = $True
+					Write-Information -MessageData "Multiple physical disks matched to $($LogicalDisk.FriendlyName)'s serial number."
+
+
+					$SizeGB = @()
+					ForEach ( $PhysDisk in $PhysicalDisk )
+					{
+						$SizeGB.add([math]::Round($PhysDisk.Size / 1GB, 2))
+					}
+				}
+
+				# Exactly one physical disk matched the serial number, so there is no error
+				Else
+				{
+					Write-Information -MessageData "Found matching 1 physical disk that matched $($LogicalDisk.FriendlyName)'s serial number."
+				}
+			}
+
+			# No serial number to fall back to
+			Else
+			{
+				$MatchError = $True
+			}
 		}
 
-		# If multiple physical disks have the same uniqueID as the disk, create an array of their sizes
+		# If multiple physical disks have the same uniqueID as the logical disk, create an array of their sizes
 		ElseIf ( $PhysDiskCount -gt 1 )
 		{
 			$MatchError = $True
@@ -360,10 +399,11 @@ Function Get-DiskInfo
 			$SizeGB = @()
 			ForEach ( $PhysDisk in $PhysicalDisk )
 			{
-				$SizeGB += [math]::Round($PhysicalDisk.Size / 1GB, 2)
+				$SizeGB.add([math]::Round($PhysDisk.Size / 1GB, 2))
 			}
 		}
 
+		# There is a single matching physical disk object
 		Else
 		{
 			$SizeGB = [math]::Round($PhysicalDisk.Size / 1GB, 2)
@@ -372,6 +412,11 @@ Function Get-DiskInfo
 		If ( $LogicalDisk.SerialNumber )
 		{
 			$Serial = $LogicalDisk.SerialNumber.Trim()
+		}
+
+		Else
+		{
+			$Serial = $null
 		}
 
 		# Obtain disk reliability statistics
@@ -399,9 +444,10 @@ Function Get-DiskInfo
 			"FirmwareVersion"        = $LogicalDisk.FirmwareVersion
 			"Size(GB)"               = $SizeGB
 			"GUID"                   = $LogicalDisk.Guid
+			"Health Status"          = $LogicalDisk.HealthStatus
+			"Wear"                   = $ReliabilityCounter.Wear
 			"Temperature"            = $ReliabilityCounter.Temperature
 			"TemperatureMax"         = $ReliabilityCounter.TemperatureMax
-			"Wear"                   = $ReliabilityCounter.Wear
 			"PowerOnHours"           = $ReliabilityCounter.PowerOnHours
 			"ReadErrorsUncorrected"  = $ReliabilityCounter.ReadErrorsUncorrected
 			"ReadErrorsCorrected"    = $ReliabilityCounter.ReadErrorsCorrected
@@ -1025,7 +1071,7 @@ $Definition = @'
 }
 
 # Loop until a process exits for a specified number of seconds, kills the process if the timeout is reached
-Function Wait-Process
+Function Wait-ProcessCustom
 {
 	Param
 	(

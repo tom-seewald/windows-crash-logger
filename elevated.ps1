@@ -13,7 +13,10 @@ Param
 	$Path,
 	[ValidateNotNullorEmpty()]
 	[string]
-	$Guid
+	$Guid,
+	[ValidateScript({ Test-Path -Path $_ })]
+	[string]
+	$TempFolderPath
 )
 
 # Any errors at the start should be treated as fatal
@@ -26,9 +29,8 @@ $StopWatchElevated = [System.Diagnostics.StopWatch]::StartNew()
 $PSDefaultParameterValues['*:Encoding'] = 'UTF8'
 
 # Log file
-$TranscriptFile  = "transcript-elevated-" + $Guid + ".txt"
-$TranscriptFinal = "transcript-elevated.txt"
-$TranscriptPath  = Join-Path -Path $env:TEMP -ChildPath $TranscriptFile
+$TranscriptFile  = "transcript-elevated.txt"
+$TranscriptPath  = Join-Path -Path $TempFolderPath -ChildPath $TranscriptFile
 
 # Begin logging
 Start-Transcript -Path $TranscriptPath -Force | Out-Null
